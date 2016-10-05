@@ -38,7 +38,7 @@ create table archive (
 
 create table feeds (
     id  number generated always as identity,
-    timestamp DEFAULT current_timestamp,
+    event_time timestamp DEFAULT current_timestamp,
     feedid varchar2(100) not null,
     previous varchar2(100)
 );
