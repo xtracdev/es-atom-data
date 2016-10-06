@@ -1,3 +1,4 @@
+@feedinit
 Feature: Feed initialization
   Scenario:
     Given a new feed environment
