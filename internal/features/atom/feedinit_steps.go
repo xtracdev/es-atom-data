@@ -12,8 +12,8 @@ import (
 
 func init() {
 	var initFailure bool
-	env, db, err := initializeEnvironment()
-	if env != nil {
+	_, db, err := initializeEnvironment()
+	if err != nil {
 		initFailure = false
 	}
 
