@@ -6,11 +6,15 @@ import (
 	. "github.com/gucumber/gucumber"
 	_ "github.com/mattn/go-oci8"
 	"github.com/stretchr/testify/assert"
+	ap "github.com/xtracdev/es-atom-data"
+	"github.com/xtracdev/goes"
+	"github.com/xtracdev/orapub"
 )
 
 func init() {
 	var env *envConfig
 	var db *sql.DB
+	var atomProcessor orapub.EventProcessor
 
 	var initializeEnvironment = func() error {
 		var err error
@@ -44,5 +48,21 @@ func init() {
 			_, err = db.Exec("delete from feeds")
 			assert.Nil(T, err)
 		}
+	})
+
+	When(`^we start up the feed processor$`, func() {
+		atomProcessor = ap.NewESAtomPubProcessor()
+		err := atomProcessor.Initialize(db)
+		assert.Nil(T, err)
+	})
+
+	And(`^some events are published$`, func() {
+		eventPtr := &goes.Event{
+			Source:   "agg1",
+			Version:  1,
+			TypeCode: "foo",
+			Payload:  []byte("ok"),
+		}
+		atomProcessor.Processor(db, eventPtr)
 	})
 }
