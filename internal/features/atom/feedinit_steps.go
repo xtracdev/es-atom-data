@@ -65,4 +65,31 @@ func init() {
 		}
 		atomProcessor.Processor(db, eventPtr)
 	})
+
+	And(`^the number of events is lower than the feed threshold$`, func() {
+		//Get this one for free :-)
+	})
+
+	Then(`^the events are stored in the recent table with a null feed id$`, func() {
+		var feedid sql.NullString
+		err := db.QueryRow("select feedid from recent where aggregate_id = 'agg1'").Scan(&feedid)
+		assert.Nil(T,err)
+		assert.False(T,feedid.Valid)
+	})
+
+	And(`^there are no archived events$`, func() {
+		var count = -1
+		err := db.QueryRow("select count(*) from archive").Scan(&count)
+		if assert.Nil(T, err) {
+			assert.Equal(T, count, 0)
+		}
+	})
+
+	And(`^there are no records in the feeds table$`, func() {
+		var count = -1
+		err := db.QueryRow("select count(*) from feeds").Scan(&count)
+		if assert.Nil(T, err) {
+			assert.Equal(T, count, 0)
+		}
+	})
 }
