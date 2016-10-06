@@ -1,3 +1,4 @@
+@feedidassigned
 Feature: Feed id assigned
   Scenario:
     Given some initial events and no archived events and no feeds

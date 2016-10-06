@@ -2,7 +2,6 @@ package atom
 
 import (
 	"database/sql"
-	log "github.com/Sirupsen/logrus"
 	. "github.com/gucumber/gucumber"
 	_ "github.com/mattn/go-oci8"
 	"github.com/stretchr/testify/assert"
@@ -12,34 +11,19 @@ import (
 )
 
 func init() {
-	var env *envConfig
-	var db *sql.DB
-	var atomProcessor orapub.EventProcessor
-
-	var initializeEnvironment = func() error {
-		var err error
-		env, err = NewEnvConfig()
-		if err != nil {
-			return err
-		}
-
-		log.Infof("Connection for test: %s", env.MaskedConnectString())
-
-		db, err = sql.Open("oci8", env.ConnectString())
-		if err != nil {
-			return err
-		}
-
-		err = db.Ping()
-		if err != nil {
-			return err
-		}
-
-		return nil
+	var initFailure bool
+	env, db, err := initializeEnvironment()
+	if env != nil {
+		initFailure = false
 	}
 
+	var atomProcessor orapub.EventProcessor
+
 	Given(`^a new feed environment$`, func() {
-		err := initializeEnvironment()
+		if assert.False(T, initFailure) {
+			return
+		}
+
 		if assert.Nil(T, err) {
 			_, err = db.Exec("delete from recent")
 			assert.Nil(T, err)
@@ -67,14 +51,14 @@ func init() {
 	})
 
 	And(`^the number of events is lower than the feed threshold$`, func() {
-		//Get this one for free :-)
+		//Here we use the known starting state with the assumption our feed threshold is > 1
 	})
 
 	Then(`^the events are stored in the recent table with a null feed id$`, func() {
 		var feedid sql.NullString
 		err := db.QueryRow("select feedid from recent where aggregate_id = 'agg1'").Scan(&feedid)
-		assert.Nil(T,err)
-		assert.False(T,feedid.Valid)
+		assert.Nil(T, err)
+		assert.False(T, feedid.Valid)
 	})
 
 	And(`^there are no archived events$`, func() {

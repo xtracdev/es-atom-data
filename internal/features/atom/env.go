@@ -1,8 +1,10 @@
 package atom
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
+	log "github.com/Sirupsen/logrus"
 	"os"
 	"strings"
 )
@@ -65,4 +67,25 @@ func NewEnvConfig() (*envConfig, error) {
 		DBSvc:      dbSvc,
 	}, nil
 
+}
+
+func initializeEnvironment() (*envConfig, *sql.DB, error) {
+	env, err := NewEnvConfig()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	log.Infof("Connection for test: %s", env.MaskedConnectString())
+
+	db, err := sql.Open("oci8", env.ConnectString())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = db.Ping()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return env, db, nil
 }
