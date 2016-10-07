@@ -90,52 +90,56 @@ func createNewFeed(tx *sql.Tx, currentFeedId sql.NullString) error {
 	return err
 }
 
+func processEvent(db *sql.DB, event *goes.Event) error {
+	log.Info("Processor invoked")
+
+	//Need a transaction to group the work in this method
+	log.Info("create transaction")
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+
+	defer tx.Rollback()
+
+	//Get the current feed id
+	feedid, err := readPreviousFeedId(tx)
+	log.Infof("previous feed id is %s", feedid.String)
+
+	//Insert current row
+	err = writeEventToRecentTable(tx, event)
+	if err != nil {
+		return err
+	}
+
+	//Get current count of records in the current feed
+	count, err := getRecentFeedCount(tx)
+	if err != nil {
+		return err
+	}
+	log.Infof("current count is %d", count)
+
+	//Threshold met
+	if count == FeedThreshold {
+		err := createNewFeed(tx, feedid)
+		if err != nil {
+			return err
+		}
+	}
+
+	log.Info("commit txn")
+	tx.Commit()
+
+	return nil
+}
+
 func NewESAtomPubProcessor() orapub.EventProcessor {
 	return orapub.EventProcessor{
 		Initialize: func(db *sql.DB) error {
 			return nil
 		},
 		Processor: func(db *sql.DB, event *goes.Event) error {
-			log.Info("Processor invoked")
-
-			//Need a transaction to group the work in this method
-			log.Info("create transaction")
-			tx, err := db.Begin()
-			if err != nil {
-				return err
-			}
-
-			defer tx.Rollback()
-
-			//Get the current feed id
-			feedid, err := readPreviousFeedId(tx)
-			log.Infof("previous feed id is %s", feedid.String)
-
-			//Insert current row
-			err = writeEventToRecentTable(tx, event)
-			if err != nil {
-				return err
-			}
-
-			//Get current count of records in the current feed
-			count, err := getRecentFeedCount(tx)
-			if err != nil {
-				return err
-			}
-			log.Infof("current count is %d", count)
-
-			//Threshold met
-			if count == FeedThreshold {
-				err := createNewFeed(tx, feedid)
-				if err != nil {
-					return err
-				}
-			}
-
-			log.Info("commit txn")
-			tx.Commit()
-
-			return nil
+			return processEvent(db, event)
 		},
 	}
 }
