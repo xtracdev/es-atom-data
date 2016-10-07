@@ -6,6 +6,7 @@ import (
 	"gopkg.in/DATA-DOG/go-sqlmock.v1"
 	"os"
 	"testing"
+	"github.com/xtracdev/goes"
 )
 
 func TestSetThresholdFromEnv(t *testing.T) {
@@ -22,6 +23,7 @@ func TestSetThresholdToDefaultOnBadEnvSpec(t *testing.T) {
 }
 
 func TestReadPreviousFeedId(t *testing.T) {
+	os.Unsetenv("FEED_THRESHOLD")
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
@@ -85,4 +87,29 @@ func TestReadPreviousFeedIdScanError(t *testing.T) {
 		err = mock.ExpectationsWereMet()
 		assert.Nil(t, err)
 	}
+}
+
+
+func TestWriteEvent(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer db.Close()
+
+	eventPtr := &goes.Event{
+		Source:   "agg1",
+		Version:  1,
+		TypeCode: "foo",
+		Payload:  []byte("ok"),
+	}
+
+	mock.ExpectBegin()
+	mock.ExpectExec("insert into atom_event")
+
+	tx, _ := db.Begin()
+	err = writeEventToAtomEventTable(tx,eventPtr)
+	assert.Nil(t,nil)
+	err = mock.ExpectationsWereMet()
+	assert.Nil(t, err)
 }
