@@ -4,19 +4,19 @@ This project processes events from the [Oracle Event Store](https://github.com/x
 writing them into organized storage to allow navigating published events
 using the atom protocol.
 
-This project uses two tables: a recent table, and an archive table. Recent 
-events go in the recent table, archived go in the archived table.
+This project uses two tables: the atom_event table to store the events
+associated with the atom feed, and the feed table, which keeps track of the 
+feeds. The overall event history can be traversed from the current feed
+backwards using the previous entry in the feeds table. The recent items
+are those that have not been assigned a feedid.
 
 As events get written to the recent table, once the size threshold for a feed is read,
-they are assigned a feed id and moved to the archive table. An additional table, 
-feeds, is used to keep track of the relationship between feeds, so we can
-identity the previous feed from recent, and can navigate backwards and 
-forwards through the event history using the link relations.
+they are assigned a feed id.
 
 ## Table Definitions
 
 <pre>
-create table recent (
+create table atom_event (
     id number generated always as identity,
     feedid varchar2(100),
     event_time timestamp DEFAULT current_timestamp,
@@ -26,17 +26,7 @@ create table recent (
     payload blob
 );
 
-create table archive (
-    feedid varchar2(100),
-    event_time timestamp DEFAULT current_timestamp,
-    aggregate_id varchar2(60)not null,
-    version integer not null,
-    typecode varchar2(30) not null,
-    payload blob,
-    primary key (aggregate_id, feedid)
-);
-
-create table feeds (
+create table feed (
     id  number generated always as identity,
     event_time timestamp DEFAULT current_timestamp,
     feedid varchar2(100) not null,

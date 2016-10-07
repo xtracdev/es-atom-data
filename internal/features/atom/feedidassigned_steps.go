@@ -23,7 +23,7 @@ func init() {
 		initFailed = true
 	}
 
-	Given(`^some initial events and no archived events and no feeds$`, func() {
+	Given(`^some initial events and no feeds$`, func() {
 		log.Info("check init")
 		if initFailed {
 			T.Errorf("Failed init")
@@ -36,11 +36,9 @@ func init() {
 		assert.Nil(T, err, "Failed to initialize atom publisher")
 
 		log.Info("clean out tables")
-		_, err = db.Exec("delete from recent")
+		_, err = db.Exec("delete from atom_event")
 		assert.Nil(T, err)
-		_, err = db.Exec("delete from archive")
-		assert.Nil(T, err)
-		_, err = db.Exec("delete from feeds")
+		_, err = db.Exec("delete from feed")
 		assert.Nil(T, err)
 
 		log.Info("add some events")
@@ -72,17 +70,14 @@ func init() {
 		assert.Nil(T, err)
 	})
 
-	And(`^the archiver has not run$`, func() {
-	})
-
-	Then(`^feeds is updated with a new feedid with a null previous feed$`, func() {
+	Then(`^feed is updated with a new feedid with a null previous feed$`, func() {
 		var count int
 		err := db.QueryRow("select count(*) from feeds").Scan(&count)
 		assert.Nil(T, err)
 		assert.Equal(T, 1, count)
 
 		var feedid sql.NullString
-		err = db.QueryRow("select feedid from feeds").Scan(&feedid)
+		err = db.QueryRow("select feedid from feed").Scan(&feedid)
 		assert.Nil(T, err)
 		assert.True(T, feedid.Valid, "Feed id is not valid")
 		assert.True(T, feedid.String != "", "Feed id is empty")

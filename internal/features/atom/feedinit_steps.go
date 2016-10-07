@@ -27,11 +27,9 @@ func init() {
 		}
 
 		if assert.Nil(T, err) {
-			_, err = db.Exec("delete from recent")
+			_, err = db.Exec("delete from atom_event")
 			assert.Nil(T, err)
-			_, err = db.Exec("delete from archive")
-			assert.Nil(T, err)
-			_, err = db.Exec("delete from feeds")
+			_, err = db.Exec("delete from feed")
 			assert.Nil(T, err)
 		}
 	})
@@ -56,24 +54,16 @@ func init() {
 		//Here we use the known starting state with the assumption our feed threshold is > 1
 	})
 
-	Then(`^the events are stored in the recent table with a null feed id$`, func() {
+	Then(`^the events are stored in the atom_event table with a null feed id$`, func() {
 		var feedid sql.NullString
-		err := db.QueryRow("select feedid from recent where aggregate_id = 'agg1'").Scan(&feedid)
+		err := db.QueryRow("select feedid from atom_event where aggregate_id = 'agg1'").Scan(&feedid)
 		assert.Nil(T, err)
 		assert.False(T, feedid.Valid)
 	})
 
-	And(`^there are no archived events$`, func() {
+	And(`^there are no records in the feed table$`, func() {
 		var count = -1
-		err := db.QueryRow("select count(*) from archive").Scan(&count)
-		if assert.Nil(T, err) {
-			assert.Equal(T, count, 0)
-		}
-	})
-
-	And(`^there are no records in the feeds table$`, func() {
-		var count = -1
-		err := db.QueryRow("select count(*) from feeds").Scan(&count)
+		err := db.QueryRow("select count(*) from feed").Scan(&count)
 		if assert.Nil(T, err) {
 			assert.Equal(T, count, 0)
 		}

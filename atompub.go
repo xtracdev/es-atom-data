@@ -33,7 +33,7 @@ func readPreviousFeedId(tx *sql.Tx) (sql.NullString, error) {
 	//TODO: Need to lock feeds or concurrent processes might overwrite each other's feed update
 	log.Info("Select last feed id")
 	var feedid sql.NullString
-	rows, err := tx.Query("select feedid from feeds where event_time = (select max(event_time) from feeds)")
+	rows, err := tx.Query("select feedid from feed where event_time = (select max(event_time) from feed)")
 	if err != nil {
 		log.Warn(err.Error())
 		return feedid, err
@@ -50,9 +50,9 @@ func readPreviousFeedId(tx *sql.Tx) (sql.NullString, error) {
 	return feedid, nil
 }
 
-func writeEventToRecentTable(tx *sql.Tx, event *goes.Event) error {
-	log.Info("insert event into recent")
-	_, err := tx.Exec("insert into recent (aggregate_id, version,typecode, payload) values(:1,:2,:3,:4)",
+func writeEventToAtomEventTable(tx *sql.Tx, event *goes.Event) error {
+	log.Info("insert event into atom_event")
+	_, err := tx.Exec("insert into atom_event (aggregate_id, version,typecode, payload) values(:1,:2,:3,:4)",
 		event.Source, event.Version, event.TypeCode, event.Payload)
 	return err
 }
@@ -60,7 +60,7 @@ func writeEventToRecentTable(tx *sql.Tx, event *goes.Event) error {
 func getRecentFeedCount(tx *sql.Tx) (int, error) {
 	log.Info("get current count")
 	var count int
-	err := tx.QueryRow("select count(*) from recent where feedid is null").Scan(&count)
+	err := tx.QueryRow("select count(*) from atom_event where feedid is null").Scan(&count)
 	return count, err
 }
 
@@ -79,13 +79,13 @@ func createNewFeed(tx *sql.Tx, currentFeedId sql.NullString) error {
 	currentFeedId = sql.NullString{String: uuidStr, Valid: true}
 
 	log.Info("Update feed ids")
-	_, err = tx.Exec("update recent set feedid = :1 where feedid is null", currentFeedId)
+	_, err = tx.Exec("update atom_event set feedid = :1 where feedid is null", currentFeedId)
 	if err != nil {
 		return err
 	}
 
-	log.Info("Insert into feeds %v, %v", currentFeedId, prevFeedId)
-	_, err = tx.Exec("insert into feeds (feedid, previous) values (:1, :2)",
+	log.Info("Insert into feed %v, %v", currentFeedId, prevFeedId)
+	_, err = tx.Exec("insert into feed (feedid, previous) values (:1, :2)",
 		currentFeedId, prevFeedId)
 	return err
 }
@@ -107,7 +107,7 @@ func processEvent(db *sql.DB, event *goes.Event) error {
 	log.Infof("previous feed id is %s", feedid.String)
 
 	//Insert current row
-	err = writeEventToRecentTable(tx, event)
+	err = writeEventToAtomEventTable(tx, event)
 	if err != nil {
 		return err
 	}
