@@ -50,6 +50,46 @@ func readPreviousFeedId(tx *sql.Tx) (sql.NullString, error) {
 	return feedid, nil
 }
 
+func writeEventToRecentTable(tx *sql.Tx, event *goes.Event) error {
+	log.Info("insert event into recent")
+	_, err := tx.Exec("insert into recent (aggregate_id, version,typecode, payload) values(:1,:2,:3,:4)",
+		event.Source, event.Version, event.TypeCode, event.Payload)
+	return err
+}
+
+func getRecentFeedCount(tx *sql.Tx) (int, error) {
+	log.Info("get current count")
+	var count int
+	err := tx.QueryRow("select count(*) from recent where feedid is null").Scan(&count)
+	return count, err
+}
+
+func createNewFeed(tx *sql.Tx, currentFeedId sql.NullString) error {
+	log.Infof("Feed threshold of %d met", FeedThreshold)
+	var prevFeedId sql.NullString
+	uuidStr, err := uuid()
+	if err != nil {
+		return nil
+	}
+
+	if currentFeedId.Valid {
+		prevFeedId = currentFeedId
+
+	}
+	currentFeedId = sql.NullString{String: uuidStr, Valid: true}
+
+	log.Info("Update feed ids")
+	_, err = tx.Exec("update recent set feedid = :1 where feedid is null", currentFeedId)
+	if err != nil {
+		return err
+	}
+
+	log.Info("Insert into feeds %v, %v", currentFeedId, prevFeedId)
+	_, err = tx.Exec("insert into feeds (feedid, previous) values (:1, :2)",
+		currentFeedId, prevFeedId)
+	return err
+}
+
 func NewESAtomPubProcessor() orapub.EventProcessor {
 	return orapub.EventProcessor{
 		Initialize: func(db *sql.DB) error {
@@ -67,48 +107,26 @@ func NewESAtomPubProcessor() orapub.EventProcessor {
 
 			defer tx.Rollback()
 
+			//Get the current feed id
 			feedid, err := readPreviousFeedId(tx)
 			log.Infof("previous feed id is %s", feedid.String)
 
 			//Insert current row
-			log.Info("insert event into recent")
-			_, err = tx.Exec("insert into recent (aggregate_id, version,typecode, payload) values(:1,:2,:3,:4)",
-				event.Source, event.Version, event.TypeCode, event.Payload)
-
-			//Get current count of records in the current feed
-			log.Info("get current count")
-			var count int
-			err = tx.QueryRow("select count(*) from recent where feedid is null").Scan(&count)
+			err = writeEventToRecentTable(tx, event)
 			if err != nil {
 				return err
 			}
 
+			//Get current count of records in the current feed
+			count, err := getRecentFeedCount(tx)
+			if err != nil {
+				return err
+			}
 			log.Infof("current count is %d", count)
 
 			//Threshold met
 			if count == FeedThreshold {
-				log.Infof("Feed threshold of %d met", FeedThreshold)
-				var prevFeedId sql.NullString
-				uuidStr, err := uuid()
-				if err != nil {
-					return nil
-				}
-
-				if feedid.Valid {
-					prevFeedId = feedid
-
-				}
-				feedid = sql.NullString{String: uuidStr, Valid: true}
-
-				log.Info("Update feed ids")
-				_, err = tx.Exec("update recent set feedid = :1 where feedid is null", feedid)
-				if err != nil {
-					return err
-				}
-
-				log.Info("Insert into feeds %v, %v", feedid, prevFeedId)
-				_, err = tx.Exec("insert into feeds (feedid, previous) values (:1, :2)",
-					feedid, prevFeedId)
+				err := createNewFeed(tx, feedid)
 				if err != nil {
 					return err
 				}
