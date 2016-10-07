@@ -21,6 +21,8 @@ func ReadFeedThresholdFromEnv() {
 		threshold, err := strconv.Atoi(thresholdOverride)
 		if err != nil {
 			log.Warnf("Attempted to override threshold with non integer: %s", thresholdOverride)
+			log.Warnf("Defaulting to %d", defaultFeedThreshold)
+			FeedThreshold = defaultFeedThreshold
 			return
 		}
 
@@ -30,10 +32,9 @@ func ReadFeedThresholdFromEnv() {
 }
 
 func readPreviousFeedId(tx *sql.Tx) (sql.NullString, error) {
-	//TODO: Need to lock feeds or concurrent processes might overwrite each other's feed update
 	log.Debug("Select last feed id")
 	var feedid sql.NullString
-	rows, err := tx.Query("select feedid from feed where event_time = (select max(event_time) from feed)")
+	rows, err := tx.Query("select feedid from feed where id = (select max(id) from feed)")
 	if err != nil {
 		log.Warn(err.Error())
 		return feedid, err
