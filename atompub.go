@@ -31,7 +31,7 @@ func ReadFeedThresholdFromEnv() {
 
 func readPreviousFeedId(tx *sql.Tx) (sql.NullString, error) {
 	//TODO: Need to lock feeds or concurrent processes might overwrite each other's feed update
-	log.Info("Select last feed id")
+	log.Debug("Select last feed id")
 	var feedid sql.NullString
 	rows, err := tx.Query("select feedid from feed where event_time = (select max(event_time) from feed)")
 	if err != nil {
@@ -51,14 +51,14 @@ func readPreviousFeedId(tx *sql.Tx) (sql.NullString, error) {
 }
 
 func writeEventToAtomEventTable(tx *sql.Tx, event *goes.Event) error {
-	log.Info("insert event into atom_event")
+	log.Debug("insert event into atom_event")
 	_, err := tx.Exec("insert into atom_event (aggregate_id, version,typecode, payload) values(:1,:2,:3,:4)",
 		event.Source, event.Version, event.TypeCode, event.Payload)
 	return err
 }
 
 func getRecentFeedCount(tx *sql.Tx) (int, error) {
-	log.Info("get current count")
+	log.Debug("get current count")
 	var count int
 	err := tx.QueryRow("select count(*) from atom_event where feedid is null").Scan(&count)
 	return count, err
@@ -90,11 +90,16 @@ func createNewFeed(tx *sql.Tx, currentFeedId sql.NullString) error {
 	return err
 }
 
+func lockTable(tx *sql.Tx) error {
+	_, err := tx.Exec("lock table feed in exclusive mode")
+	return err
+}
+
 func processEvent(db *sql.DB, event *goes.Event) error {
-	log.Info("Processor invoked")
+	log.Debug("Processor invoked")
 
 	//Need a transaction to group the work in this method
-	log.Info("create transaction")
+	log.Debug("create transaction")
 	tx, err := db.Begin()
 	if err != nil {
 		return err
@@ -102,9 +107,15 @@ func processEvent(db *sql.DB, event *goes.Event) error {
 
 	defer tx.Rollback()
 
+	//Treat the processing as a critical section to avoid concurrency headaches.
+	err = lockTable(tx)
+	if err != nil {
+		return err
+	}
+
 	//Get the current feed id
 	feedid, err := readPreviousFeedId(tx)
-	log.Infof("previous feed id is %s", feedid.String)
+	log.Debugf("previous feed id is %s", feedid.String)
 
 	//Insert current row
 	err = writeEventToAtomEventTable(tx, event)
@@ -117,7 +128,7 @@ func processEvent(db *sql.DB, event *goes.Event) error {
 	if err != nil {
 		return err
 	}
-	log.Infof("current count is %d", count)
+	log.Debugf("current count is %d", count)
 
 	//Threshold met
 	if count == FeedThreshold {
@@ -127,7 +138,7 @@ func processEvent(db *sql.DB, event *goes.Event) error {
 		}
 	}
 
-	log.Info("commit txn")
+	log.Debug("commit txn")
 	tx.Commit()
 
 	return nil
