@@ -1,8 +1,10 @@
 package esatompub
 
 import (
+	"crypto/rand"
 	"database/sql"
-	logs "github.com/Sirupsen/logrus"
+	"fmt"
+	log "github.com/Sirupsen/logrus"
 	"github.com/xtracdev/goes"
 	"github.com/xtracdev/orapub"
 	"os"
@@ -18,11 +20,11 @@ func ReadFeedThresholdFromEnv() {
 	if thresholdOverride != "" {
 		threshold, err := strconv.Atoi(thresholdOverride)
 		if err != nil {
-			logs.Warnf("Attempted to override threshold with non integer: %s", thresholdOverride)
+			log.Warnf("Attempted to override threshold with non integer: %s", thresholdOverride)
 			return
 		}
 
-		logs.Infof("Overriding default feed threshold with %d", threshold)
+		log.Infof("Overriding default feed threshold with %d", threshold)
 		FeedThreshold = threshold
 	}
 }
@@ -33,9 +35,95 @@ func NewESAtomPubProcessor() orapub.EventProcessor {
 			return nil
 		},
 		Processor: func(db *sql.DB, event *goes.Event) error {
-			_, err := db.Exec("insert into recent (aggregate_id, version,typecode, payload) values(:1,:2,:3,:4)",
+			log.Info("Processor invoked")
+
+			//Need a transaction to group the work in this method
+			log.Info("create transaction")
+			tx, err := db.Begin()
+			if err != nil {
+				return err
+			}
+
+			defer tx.Rollback()
+
+			//TODO: Need to lock feeds or concurrent processes might overwrite each other's feed update
+			log.Info("Select last feed id")
+			var feedid sql.NullString
+			rows, err := tx.Query("select feedid from feeds where event_time = (select max(event_time) from feeds)")
+			if err != nil {
+				log.Warn(err.Error())
+				return err
+			}
+
+			defer rows.Close()
+			for rows.Next() {
+				//Only one row can be returned at mpst
+				if err := rows.Scan(&feedid); err != nil {
+					return err
+				}
+			}
+
+			log.Infof("previous feed id is %s", feedid.String)
+
+			//Insert current row
+			log.Info("insert event into recent")
+			_, err = tx.Exec("insert into recent (aggregate_id, version,typecode, payload) values(:1,:2,:3,:4)",
 				event.Source, event.Version, event.TypeCode, event.Payload)
-			return err
+
+			//Get current count of records in the current feed
+			log.Info("get current count")
+			var count int
+			err = tx.QueryRow("select count(*) from recent where feedid is null").Scan(&count)
+			if err != nil {
+				return err
+			}
+
+			log.Infof("current count is %d", count)
+
+			//Threshold met
+			if count == FeedThreshold {
+				log.Infof("Feed threshold of %d met", FeedThreshold)
+				var prevFeedId sql.NullString
+				uuidStr, err := uuid()
+				if err != nil {
+					return nil
+				}
+
+				if feedid.Valid {
+					prevFeedId = feedid
+
+				}
+				feedid = sql.NullString{String: uuidStr, Valid: true}
+
+				log.Info("Update feed ids")
+				_, err = tx.Exec("update recent set feedid = :1 where feedid is null", feedid)
+				if err != nil {
+					return err
+				}
+
+				log.Info("Insert into feeds %v, %v", feedid, prevFeedId)
+				_, err = tx.Exec("insert into feeds (feedid, previous) values (:1, :2)",
+					feedid, prevFeedId)
+				if err != nil {
+					return err
+				}
+			}
+
+			log.Info("commit txn")
+			tx.Commit()
+
+			return nil
 		},
 	}
+}
+
+func uuid() (string, error) {
+	b := make([]byte, 16)
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%X-%X-%X-%X-%X", b[0:4], b[4:6], b[6:8], b[8:10], b[10:]), nil
+
 }

@@ -7,29 +7,35 @@ import (
 	"github.com/xtracdev/goes"
 	"github.com/xtracdev/orapub"
 	"os"
+	//"database/sql"
+	"database/sql"
+	log "github.com/Sirupsen/logrus"
 )
 
 func init() {
 	var atomProcessor orapub.EventProcessor
-	var initFailure bool
+	var initFailed bool
+
+	log.Info("Init test envionment")
 	_, db, err := initializeEnvironment()
 	if err != nil {
-		initFailure = false
+		log.Warnf("Failed environment init: %s", err.Error())
+		initFailed = true
 	}
 
 	Given(`^some initial events and no archived events and no feeds$`, func() {
-		if assert.False(T, initFailure) {
+		log.Info("check init")
+		if initFailed {
+			T.Errorf("Failed init")
 			return
 		}
 
-		if assert.False(T, initFailure) {
-			return
-		}
-
+		log.Info("Create atom pub processor")
 		atomProcessor = ad.NewESAtomPubProcessor()
 		err := atomProcessor.Initialize(db)
-		assert.Nil(T, err)
+		assert.Nil(T, err, "Failed to initialize atom publisher")
 
+		log.Info("clean out tables")
 		_, err = db.Exec("delete from recent")
 		assert.Nil(T, err)
 		_, err = db.Exec("delete from archive")
@@ -37,21 +43,16 @@ func init() {
 		_, err = db.Exec("delete from feeds")
 		assert.Nil(T, err)
 
+		log.Info("add some events")
 		eventPtr := &goes.Event{
 			Source:   "agg1",
 			Version:  1,
 			TypeCode: "foo",
 			Payload:  []byte("ok"),
 		}
-		atomProcessor.Processor(db, eventPtr)
 
-		eventPtr = &goes.Event{
-			Source:   "agg2",
-			Version:  1,
-			TypeCode: "foo",
-			Payload:  []byte("ok?"),
-		}
-		atomProcessor.Processor(db, eventPtr)
+		err = atomProcessor.Processor(db, eventPtr)
+		assert.Nil(T, err)
 
 	})
 
@@ -59,5 +60,31 @@ func init() {
 		os.Setenv("FEED_THRESHOLD", "2")
 		ad.ReadFeedThresholdFromEnv()
 		assert.Equal(T, 2, ad.FeedThreshold)
+
+		eventPtr := &goes.Event{
+			Source:   "agg2",
+			Version:  1,
+			TypeCode: "foo",
+			Payload:  []byte("ok?"),
+		}
+
+		err = atomProcessor.Processor(db, eventPtr)
+		assert.Nil(T, err)
+	})
+
+	And(`^the archiver has not run$`, func() {
+	})
+
+	Then(`^feeds is updated with a new feedid with a null previous feed$`, func() {
+		var count int
+		err := db.QueryRow("select count(*) from feeds").Scan(&count)
+		assert.Nil(T, err)
+		assert.Equal(T, 1, count)
+
+		var feedid sql.NullString
+		err = db.QueryRow("select feedid from feeds").Scan(&feedid)
+		assert.Nil(T, err)
+		assert.True(T, feedid.Valid, "Feed id is not valid")
+		assert.True(T, feedid.String != "", "Feed id is empty")
 	})
 }
