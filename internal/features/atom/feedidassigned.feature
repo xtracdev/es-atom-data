@@ -3,7 +3,7 @@ Feature: Feed id assigned
   Scenario:
     Given some initial events and no feeds
     When the feed page threshold is reached
-    Then feeds is updated with a new feedid with a null previous feed
+    Then feed is updated with a new feedid with a null previous feed
     And the recent items with a null id are updated with the feedid
 
   Scenario:

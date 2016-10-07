@@ -15,6 +15,7 @@ import (
 func init() {
 	var atomProcessor orapub.EventProcessor
 	var initFailed bool
+	var feedid sql.NullString
 
 	log.Info("Init test envionment")
 	_, db, err := initializeEnvironment()
@@ -72,14 +73,62 @@ func init() {
 
 	Then(`^feed is updated with a new feedid with a null previous feed$`, func() {
 		var count int
-		err := db.QueryRow("select count(*) from feeds").Scan(&count)
+		err := db.QueryRow("select count(*) from feed").Scan(&count)
 		assert.Nil(T, err)
-		assert.Equal(T, 1, count)
+		assert.Equal(T, 1, count, "Expected a single feed entry")
 
-		var feedid sql.NullString
+
 		err = db.QueryRow("select feedid from feed").Scan(&feedid)
 		assert.Nil(T, err)
 		assert.True(T, feedid.Valid, "Feed id is not valid")
 		assert.True(T, feedid.String != "", "Feed id is empty")
+	})
+
+	And(`^the recent items with a null id are updated with the feedid$`, func() {
+		rows, err := db.Query("select aggregate_id, feedid from atom_event")
+		if assert.Nil(T,err) {
+			defer rows.Close()
+
+			var aggid string
+			var eventFeedId sql.NullString
+			var rowCount int
+			for rows.Next() {
+				rowCount += 1
+				err := rows.Scan(&aggid,&eventFeedId)
+				assert.Nil(T,err)
+				if assert.True(T,eventFeedId.Valid) {
+					assert.Equal(T,feedid.String, eventFeedId.String)
+				}
+
+			}
+
+			assert.Equal(T, 2, rowCount, "Expected two events to be read from atom_event")
+		}
+	})
+
+	Given(`^some initial events and some feeds$`, func() {
+		//From the previous test run
+	})
+
+	When(`^the feed page threshold is reached again$`, func() {
+		eventPtr := &goes.Event{
+			Source:   "agg3",
+			Version:  1,
+			TypeCode: "foo",
+			Payload:  []byte("ok?"),
+		}
+
+		err = atomProcessor.Processor(db, eventPtr)
+		assert.Nil(T, err)
+
+		eventPtr = &goes.Event{
+			Source:   "agg4",
+			Version:  1,
+			TypeCode: "foo",
+			Payload:  []byte("ok?"),
+		}
+
+		err = atomProcessor.Processor(db, eventPtr)
+		assert.Nil(T, err)
 	})
 }

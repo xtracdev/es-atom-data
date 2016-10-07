@@ -84,7 +84,7 @@ func createNewFeed(tx *sql.Tx, currentFeedId sql.NullString) error {
 		return err
 	}
 
-	log.Info("Insert into feed %v, %v", currentFeedId, prevFeedId)
+	log.Infof("Insert into feed %v, %v", currentFeedId, prevFeedId)
 	_, err = tx.Exec("insert into feed (feedid, previous) values (:1, :2)",
 		currentFeedId, prevFeedId)
 	return err
