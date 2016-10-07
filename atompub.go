@@ -29,6 +29,27 @@ func ReadFeedThresholdFromEnv() {
 	}
 }
 
+func readPreviousFeedId(tx *sql.Tx) (sql.NullString, error) {
+	//TODO: Need to lock feeds or concurrent processes might overwrite each other's feed update
+	log.Info("Select last feed id")
+	var feedid sql.NullString
+	rows, err := tx.Query("select feedid from feeds where event_time = (select max(event_time) from feeds)")
+	if err != nil {
+		log.Warn(err.Error())
+		return feedid, err
+	}
+
+	defer rows.Close()
+	for rows.Next() {
+		//Only one row can be returned at mpst
+		if err := rows.Scan(&feedid); err != nil {
+			return feedid, err
+		}
+	}
+
+	return feedid, nil
+}
+
 func NewESAtomPubProcessor() orapub.EventProcessor {
 	return orapub.EventProcessor{
 		Initialize: func(db *sql.DB) error {
@@ -46,23 +67,7 @@ func NewESAtomPubProcessor() orapub.EventProcessor {
 
 			defer tx.Rollback()
 
-			//TODO: Need to lock feeds or concurrent processes might overwrite each other's feed update
-			log.Info("Select last feed id")
-			var feedid sql.NullString
-			rows, err := tx.Query("select feedid from feeds where event_time = (select max(event_time) from feeds)")
-			if err != nil {
-				log.Warn(err.Error())
-				return err
-			}
-
-			defer rows.Close()
-			for rows.Next() {
-				//Only one row can be returned at mpst
-				if err := rows.Scan(&feedid); err != nil {
-					return err
-				}
-			}
-
+			feedid, err := readPreviousFeedId(tx)
 			log.Infof("previous feed id is %s", feedid.String)
 
 			//Insert current row
