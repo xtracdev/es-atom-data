@@ -1,15 +1,14 @@
 package atom
 
 import (
+	"database/sql"
+	log "github.com/Sirupsen/logrus"
 	. "github.com/gucumber/gucumber"
 	"github.com/stretchr/testify/assert"
 	ad "github.com/xtracdev/es-atom-data"
 	"github.com/xtracdev/goes"
 	"github.com/xtracdev/orapub"
 	"os"
-	//"database/sql"
-	"database/sql"
-	log "github.com/Sirupsen/logrus"
 )
 
 func init() {
@@ -77,7 +76,6 @@ func init() {
 		assert.Nil(T, err)
 		assert.Equal(T, 1, count, "Expected a single feed entry")
 
-
 		err = db.QueryRow("select feedid from feed").Scan(&feedid)
 		assert.Nil(T, err)
 		assert.True(T, feedid.Valid, "Feed id is not valid")
@@ -86,7 +84,7 @@ func init() {
 
 	And(`^the recent items with a null id are updated with the feedid$`, func() {
 		rows, err := db.Query("select aggregate_id, feedid from atom_event")
-		if assert.Nil(T,err) {
+		if assert.Nil(T, err) {
 			defer rows.Close()
 
 			var aggid string
@@ -94,10 +92,10 @@ func init() {
 			var rowCount int
 			for rows.Next() {
 				rowCount += 1
-				err := rows.Scan(&aggid,&eventFeedId)
-				assert.Nil(T,err)
-				if assert.True(T,eventFeedId.Valid) {
-					assert.Equal(T,feedid.String, eventFeedId.String)
+				err := rows.Scan(&aggid, &eventFeedId)
+				assert.Nil(T, err)
+				if assert.True(T, eventFeedId.Valid) {
+					assert.Equal(T, feedid.String, eventFeedId.String)
 				}
 
 			}
@@ -134,8 +132,8 @@ func init() {
 
 	Then(`^feed is updated with a new feedid with the previous feed id as previous$`, func() {
 		var current, previous sql.NullString
-		err := db.QueryRow("select feedid, previous from feed where id = (select max(id) from feed)").Scan(&current,&previous)
-		if assert.Nil(T,err) {
+		err := db.QueryRow("select feedid, previous from feed where id = (select max(id) from feed)").Scan(&current, &previous)
+		if assert.Nil(T, err) {
 			assert.True(T, current.Valid)
 			if assert.True(T, previous.Valid) {
 				assert.Equal(T, previous.String, feedid.String)
@@ -146,7 +144,7 @@ func init() {
 	And(`^the most recent items with a null id are updated with the new feedid$`, func() {
 		var nullCount int = -1
 		err := db.QueryRow("select count(*) from atom_event where feedid is null").Scan(&nullCount)
-		assert.Nil(T,err)
+		assert.Nil(T, err)
 	})
 
 }
