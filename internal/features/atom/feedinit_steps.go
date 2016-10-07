@@ -11,16 +11,18 @@ import (
 )
 
 func init() {
-	var initFailure bool
+	var initFailed bool
 	_, db, err := initializeEnvironment()
 	if err != nil {
-		initFailure = false
+		initFailed = true
 	}
 
 	var atomProcessor orapub.EventProcessor
 
 	Given(`^a new feed environment$`, func() {
-		if assert.False(T, initFailure) {
+
+		if initFailed {
+			T.Errorf("Failed init")
 			return
 		}
 
