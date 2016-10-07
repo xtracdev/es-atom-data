@@ -131,4 +131,22 @@ func init() {
 		err = atomProcessor.Processor(db, eventPtr)
 		assert.Nil(T, err)
 	})
+
+	Then(`^feed is updated with a new feedid with the previous feed id as previous$`, func() {
+		var current, previous sql.NullString
+		err := db.QueryRow("select feedid, previous from feed where id = (select max(id) from feed)").Scan(&current,&previous)
+		if assert.Nil(T,err) {
+			assert.True(T, current.Valid)
+			if assert.True(T, previous.Valid) {
+				assert.Equal(T, previous.String, feedid.String)
+			}
+		}
+	})
+
+	And(`^the most recent items with a null id are updated with the new feedid$`, func() {
+		var nullCount int = -1
+		err := db.QueryRow("select count(*) from atom_event where feedid is null").Scan(&nullCount)
+		assert.Nil(T,err)
+	})
+
 }
