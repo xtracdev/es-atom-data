@@ -188,3 +188,23 @@ func TestProcessEvents(t *testing.T) {
 	err = mock.ExpectationsWereMet()
 	assert.Nil(t, err)
 }
+
+func TestProcessorBeginTxnFailure(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer db.Close()
+
+	mock.ExpectBegin().WillReturnError(errors.New("sorry mate no txn for you"))
+
+	err = processEvent(db, nil)
+	assert.NotNil(t, err)
+	err = mock.ExpectationsWereMet()
+	assert.Nil(t, err)
+}
+
+func TestProcessEventsUpdateFeedIdsFailure(t *testing.T) {
+
+
+}
