@@ -150,7 +150,7 @@ func TestProcessEvents(t *testing.T) {
 	mock.ExpectBegin()
 
 	//table lock is acquired in the happy path
-	execOkResult := sqlmock.NewResult(1,1)
+	execOkResult := sqlmock.NewResult(1, 1)
 	mock.ExpectExec("lock table feed").WillReturnResult(execOkResult)
 
 	//feed id is selected
@@ -172,12 +172,17 @@ func TestProcessEvents(t *testing.T) {
 	mock.ExpectExec("update atom_event set feedid").WillReturnResult(execOkResult)
 
 	//insert the new feed into the feed table
-	mock.ExpectExec("insert into feed").WillReturnResult(execOkResult).WithArgs(sqlmock.AnyArg(),"XXX")
+	mock.ExpectExec("insert into feed").WillReturnResult(execOkResult).WithArgs(sqlmock.AnyArg(), "XXX")
 
 	//expect a commit at the end
 	mock.ExpectCommit()
 
-	err = processEvent(db, eventPtr)
+	processor := NewESAtomPubProcessor()
+
+	err = processor.Initialize(db)
+	assert.Nil(t, err)
+
+	err = processor.Processor(db, eventPtr)
 	assert.Nil(t, err)
 
 	err = mock.ExpectationsWereMet()
