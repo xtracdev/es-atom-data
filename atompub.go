@@ -18,13 +18,17 @@ const defaultFeedThreshold = 100
 const (
 	sqlLatestFeedId        = `select feedid from feed where id = (select max(id) from feed)`
 	sqlInsertEventIntoFeed = `insert into atom_event (aggregate_id, version,typecode, payload) values(:1,:2,:3,:4)`
+	sqlRecentFeedCount = `select count(*) from atom_event where feedid is null`
+	sqlUpdateFeedIds = `update atom_event set feedid = :1 where feedid is null`
+	sqlInsertFeed = `insert into feed (feedid, previous) values (:1, :2)`
+	sqlLockTable = `lock table feed in exclusive mode`
 )
 
 var FeedThreshold = defaultFeedThreshold
 
 func logDBTime(sql string, start time.Time, err error) {
 	duration := time.Now().Sub(start)
-	go func() {
+	go func(sql string, duration time.Duration, err error) {
 		ms := float32(duration.Nanoseconds()) / 1000.0 / 1000.0
 		if err != nil {
 			key := []string{"es-atom-data", "db", fmt.Sprintf("%s-error", sql)}
@@ -35,7 +39,23 @@ func logDBTime(sql string, start time.Time, err error) {
 			metrics.AddSample(key, float32(ms))
 			metrics.IncrCounter(key, 1)
 		}
-	}()
+	}(sql,duration,err)
+}
+
+func writeProcessEventStats(start time.Time, err error) {
+	duration := time.Now().Sub(start)
+	go func(duration time.Duration, err error) {
+		ms := float32(duration.Nanoseconds()) / 1000.0 / 1000.0
+		if err != nil {
+			key := []string{"es-atom-data", "process-event", "error"}
+			metrics.AddSample(key, float32(ms))
+			metrics.IncrCounter(key, 1)
+		} else {
+			key := []string{"es-atom-data", "process-event", "ok"}
+			metrics.AddSample(key, float32(ms))
+			metrics.IncrCounter(key, 1)
+		}
+	}(duration,err)
 }
 
 func ReadFeedThresholdFromEnv() {
@@ -90,7 +110,10 @@ func writeEventToAtomEventTable(tx *sql.Tx, event *goes.Event) error {
 func getRecentFeedCount(tx *sql.Tx) (int, error) {
 	log.Debug("get current count")
 	var count int
-	err := tx.QueryRow("select count(*) from atom_event where feedid is null").Scan(&count)
+	start := time.Now()
+	err := tx.QueryRow(sqlRecentFeedCount).Scan(&count)
+	logDBTime("sqlRecentFeedCount", start, err)
+
 	return count, err
 }
 
@@ -109,19 +132,28 @@ func createNewFeed(tx *sql.Tx, currentFeedId sql.NullString) error {
 	currentFeedId = sql.NullString{String: uuidStr, Valid: true}
 
 	log.Info("Update feed ids")
-	_, err = tx.Exec("update atom_event set feedid = :1 where feedid is null", currentFeedId)
+
+	start := time.Now()
+	_, err = tx.Exec(sqlUpdateFeedIds, currentFeedId)
+	logDBTime("sqlUpdateFeedIds", start, err)
+
 	if err != nil {
 		return err
 	}
 
+
 	log.Infof("Insert into feed %v, %v", currentFeedId, prevFeedId)
-	_, err = tx.Exec("insert into feed (feedid, previous) values (:1, :2)",
+	start = time.Now()
+	_, err = tx.Exec(sqlInsertFeed,
 		currentFeedId, prevFeedId)
+	logDBTime("sqlInsertFeed", start, err)
 	return err
 }
 
 func lockTable(tx *sql.Tx) error {
-	_, err := tx.Exec("lock table feed in exclusive mode")
+	start := time.Now()
+	_, err := tx.Exec(sqlLockTable)
+	logDBTime("sqlLockTable", start, err)
 	return err
 }
 
@@ -205,7 +237,10 @@ func NewESAtomPubProcessor() orapub.EventProcessor {
 			return nil
 		},
 		Processor: func(db *sql.DB, event *goes.Event) error {
-			return processEvent(db, event)
+			start := time.Now()
+			err :=  processEvent(db, event)
+			writeProcessEventStats(start, err)
+			return err
 		},
 	}
 }

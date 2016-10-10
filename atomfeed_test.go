@@ -7,6 +7,8 @@ import (
 	"gopkg.in/DATA-DOG/go-sqlmock.v1"
 	"os"
 	"testing"
+	"net"
+	log "github.com/Sirupsen/logrus"
 )
 
 func TestSetThresholdFromEnv(t *testing.T) {
@@ -170,7 +172,40 @@ func testFeedInsertOk(mock sqlmock.Sqlmock, ok *bool) {
 	}
 }
 
+
 func TestProcessEvents(t *testing.T) {
+
+	addr,err := net.ResolveUDPAddr("udp",":0")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ln, err := net.ListenUDP("udp", addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	log.Infof("addr: %v", ln.LocalAddr())
+
+
+	os.Setenv("STATSD_ENDPOINT", ln.LocalAddr().String())
+
+	//Run this in the background - end of test will kill it. This is to let us have something to
+	//catch any writes of statsd data. Since the data is written using udp we might not see anything
+	//show up which is cool - we want to cover the instantiation
+	go func() {
+		buf := make([]byte, 1024)
+
+		for {
+			n, addr, err := ln.ReadFromUDP(buf)
+			log.Info("Received ", string(buf[0:n]), " from ", addr)
+
+			if err != nil {
+				log.Info("Error: ", err)
+			}
+		}
+	}()
+
 	for _, tt := range processTests {
 
 		db, mock, err := sqlmock.New()
@@ -210,4 +245,9 @@ func TestProcessEvents(t *testing.T) {
 		err = mock.ExpectationsWereMet()
 		assert.Nil(t, err)
 	}
+}
+
+func TestStatsdInit(t *testing.T) {
+	os.Unsetenv("STATSD_ENDPOINT") //Use inmem provider
+	NewESAtomPubProcessor()
 }

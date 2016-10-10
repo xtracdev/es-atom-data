@@ -34,6 +34,27 @@ create table feed (
 );
 </pre>
 
+## Viewing Emitted Statsd Telemetry Data
+
+A quick and dirty way to do this if you don't have sumo or some other way to look
+at telemetry data is to fireup nc in another window, and configure the 
+process to write to that endpoint via the STATSD_ENDPOINT environment 
+variable.
+
+For example if you have this listener:
+
+<pre>
+nc -u -l localhost 57719
+</pre>
+
+And you export STATSD_ENDPOINT thusly:
+
+<pre>
+export STATSD_ENDPOINT=localhost:57719
+</pre>
+
+When you run the gucumber tests you will set the output.
+
 ## Contributing
 
 To contribute, you must certify you agree with the [Developer Certificate of Origin](http://developercertificate.org/)
