@@ -11,7 +11,8 @@ backwards using the previous entry in the feeds table. The recent items
 are those that have not been assigned a feedid.
 
 As events get written to the recent table, once the size threshold for a feed is read,
-they are assigned a feed id.
+they are assigned a feed id. The default page size is 100 items; this may be
+overridden using the FEED_THRESHOLD environment variable.
 
 ## Table Definitions
 
@@ -34,7 +35,21 @@ create table feed (
 );
 </pre>
 
+## Testing
+
+This package has unit tests that may be run using go test, and integration
+tests that may be run using gucumber. Note the integration tests requires
+a live instance of Oracle.
+
+*Caution* The integration tests delete all records from the event and 
+feed table to run in a know good state.
+
 ## Viewing Emitted Statsd Telemetry Data
+
+This package emits counters and timing data via statsd, using the
+[go-metrics](https://github.com/armon/go-metrics) library. If the
+STATSD_ENDPOINT environment variable is set, a statsd sink is 
+configured, otherwise the in memory accumulator is used.
 
 A quick and dirty way to do this if you don't have sumo or some other way to look
 at telemetry data is to fireup nc in another window, and configure the 

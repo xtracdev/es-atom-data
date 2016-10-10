@@ -26,7 +26,7 @@ const (
 
 var FeedThreshold = defaultFeedThreshold
 
-func logDBTime(sql string, start time.Time, err error) {
+func logDatabaseTimingStats(sql string, start time.Time, err error) {
 	duration := time.Now().Sub(start)
 	go func(sql string, duration time.Duration, err error) {
 		ms := float32(duration.Nanoseconds()) / 1000.0 / 1000.0
@@ -81,7 +81,7 @@ func selectLatestFeed(tx *sql.Tx) (sql.NullString, error) {
 	start := time.Now()
 	rows, err := tx.Query(sqlLatestFeedId)
 	if err != nil {
-		logDBTime("sqlLatestFeedId", start, err)
+		logDatabaseTimingStats("sqlLatestFeedId", start, err)
 		return feedid, err
 	}
 
@@ -89,12 +89,12 @@ func selectLatestFeed(tx *sql.Tx) (sql.NullString, error) {
 	for rows.Next() {
 		//Only one row can be returned at most
 		if err = rows.Scan(&feedid); err != nil {
-			logDBTime("sqlLatestFeedId", start, err)
+			logDatabaseTimingStats("sqlLatestFeedId", start, err)
 			return feedid, err
 		}
 	}
 
-	logDBTime("sqlLatestFeedId", start, err)
+	logDatabaseTimingStats("sqlLatestFeedId", start, err)
 	return feedid, nil
 }
 
@@ -103,7 +103,7 @@ func writeEventToAtomEventTable(tx *sql.Tx, event *goes.Event) error {
 	start := time.Now()
 	_, err := tx.Exec(sqlInsertEventIntoFeed,
 		event.Source, event.Version, event.TypeCode, event.Payload)
-	logDBTime("sqlInsertEventIntoFeed", start, err)
+	logDatabaseTimingStats("sqlInsertEventIntoFeed", start, err)
 	return err
 }
 
@@ -112,7 +112,7 @@ func getRecentFeedCount(tx *sql.Tx) (int, error) {
 	var count int
 	start := time.Now()
 	err := tx.QueryRow(sqlRecentFeedCount).Scan(&count)
-	logDBTime("sqlRecentFeedCount", start, err)
+	logDatabaseTimingStats("sqlRecentFeedCount", start, err)
 
 	return count, err
 }
@@ -135,7 +135,7 @@ func createNewFeed(tx *sql.Tx, currentFeedId sql.NullString) error {
 
 	start := time.Now()
 	_, err = tx.Exec(sqlUpdateFeedIds, currentFeedId)
-	logDBTime("sqlUpdateFeedIds", start, err)
+	logDatabaseTimingStats("sqlUpdateFeedIds", start, err)
 
 	if err != nil {
 		return err
@@ -146,14 +146,14 @@ func createNewFeed(tx *sql.Tx, currentFeedId sql.NullString) error {
 	start = time.Now()
 	_, err = tx.Exec(sqlInsertFeed,
 		currentFeedId, prevFeedId)
-	logDBTime("sqlInsertFeed", start, err)
+	logDatabaseTimingStats("sqlInsertFeed", start, err)
 	return err
 }
 
 func lockTable(tx *sql.Tx) error {
 	start := time.Now()
 	_, err := tx.Exec(sqlLockTable)
-	logDBTime("sqlLockTable", start, err)
+	logDatabaseTimingStats("sqlLockTable", start, err)
 	return err
 }
 
