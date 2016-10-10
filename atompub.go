@@ -16,7 +16,8 @@ import (
 const defaultFeedThreshold = 100
 
 const (
-	sqlLatestFeedId = `select feedid from feed where id = (select max(id) from feed)`
+	sqlLatestFeedId        = `select feedid from feed where id = (select max(id) from feed)`
+	sqlInsertEventIntoFeed = `insert into atom_event (aggregate_id, version,typecode, payload) values(:1,:2,:3,:4)`
 )
 
 var FeedThreshold = defaultFeedThreshold
@@ -53,18 +54,14 @@ func ReadFeedThresholdFromEnv() {
 	}
 }
 
-func readPreviousFeedId(tx *sql.Tx) (sql.NullString, error) {
+func selectLatestFeed(tx *sql.Tx) (sql.NullString, error) {
 	log.Debug("Select last feed id")
 
 	var feedid sql.NullString
-	var err error
-	var rows *sql.Rows
-
 	start := time.Now()
-	defer logDBTime("sqlLatestFeedId", start, err)
-	rows, err = tx.Query(sqlLatestFeedId)
+	rows, err := tx.Query(sqlLatestFeedId)
 	if err != nil {
-		log.Warn(err.Error())
+		logDBTime("sqlLatestFeedId", start, err)
 		return feedid, err
 	}
 
@@ -72,17 +69,21 @@ func readPreviousFeedId(tx *sql.Tx) (sql.NullString, error) {
 	for rows.Next() {
 		//Only one row can be returned at most
 		if err = rows.Scan(&feedid); err != nil {
+			logDBTime("sqlLatestFeedId", start, err)
 			return feedid, err
 		}
 	}
 
+	logDBTime("sqlLatestFeedId", start, err)
 	return feedid, nil
 }
 
 func writeEventToAtomEventTable(tx *sql.Tx, event *goes.Event) error {
 	log.Debug("insert event into atom_event")
-	_, err := tx.Exec("insert into atom_event (aggregate_id, version,typecode, payload) values(:1,:2,:3,:4)",
+	start := time.Now()
+	_, err := tx.Exec(sqlInsertEventIntoFeed,
 		event.Source, event.Version, event.TypeCode, event.Payload)
+	logDBTime("sqlInsertEventIntoFeed", start, err)
 	return err
 }
 
@@ -143,7 +144,7 @@ func processEvent(db *sql.DB, event *goes.Event) error {
 	}
 
 	//Get the current feed id
-	feedid, err := readPreviousFeedId(tx)
+	feedid, err := selectLatestFeed(tx)
 	if err != nil {
 		return err
 	}

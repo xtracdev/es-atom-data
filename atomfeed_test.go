@@ -42,7 +42,7 @@ func TestReadPreviousFeedIdScanError(t *testing.T) {
 	mock.ExpectQuery(`select feedid from feed where id = \(select max\(id\) from feed\)`).WillReturnRows(rows)
 
 	tx, _ := db.Begin()
-	_, err = readPreviousFeedId(tx)
+	_, err = selectLatestFeed(tx)
 	if assert.NotNil(t, err) {
 		err = mock.ExpectationsWereMet()
 		assert.Nil(t, err)
