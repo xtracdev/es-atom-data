@@ -5,15 +5,37 @@ import (
 	"database/sql"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
+	"github.com/armon/go-metrics"
 	"github.com/xtracdev/goes"
 	"github.com/xtracdev/orapub"
 	"os"
 	"strconv"
+	"time"
 )
 
 const defaultFeedThreshold = 100
 
+const (
+	sqlLatestFeedId = `select feedid from feed where id = (select max(id) from feed)`
+)
+
 var FeedThreshold = defaultFeedThreshold
+
+func logDBTime(sql string, start time.Time, err error) {
+	duration := time.Now().Sub(start)
+	go func() {
+		ms := float32(duration.Nanoseconds()) / 1000.0 / 1000.0
+		if err != nil {
+			key := []string{"es-atom-data", "db", fmt.Sprintf("%s-error", sql)}
+			metrics.AddSample(key, float32(ms))
+			metrics.IncrCounter(key, 1)
+		} else {
+			key := []string{"es-atom-data", "db", sql}
+			metrics.AddSample(key, float32(ms))
+			metrics.IncrCounter(key, 1)
+		}
+	}()
+}
 
 func ReadFeedThresholdFromEnv() {
 	thresholdOverride := os.Getenv("FEED_THRESHOLD")
@@ -33,8 +55,14 @@ func ReadFeedThresholdFromEnv() {
 
 func readPreviousFeedId(tx *sql.Tx) (sql.NullString, error) {
 	log.Debug("Select last feed id")
+
 	var feedid sql.NullString
-	rows, err := tx.Query("select feedid from feed where id = (select max(id) from feed)")
+	var err error
+	var rows *sql.Rows
+
+	start := time.Now()
+	defer logDBTime("sqlLatestFeedId", start, err)
+	rows, err = tx.Query(sqlLatestFeedId)
 	if err != nil {
 		log.Warn(err.Error())
 		return feedid, err
@@ -43,7 +71,7 @@ func readPreviousFeedId(tx *sql.Tx) (sql.NullString, error) {
 	defer rows.Close()
 	for rows.Next() {
 		//Only one row can be returned at most
-		if err := rows.Scan(&feedid); err != nil {
+		if err = rows.Scan(&feedid); err != nil {
 			return feedid, err
 		}
 	}
@@ -148,7 +176,29 @@ func processEvent(db *sql.DB, event *goes.Event) error {
 	return nil
 }
 
+func configureStatsD() {
+	statsdEndpoint := os.Getenv("STATSD_ENDPOINT")
+	log.Infof("STATSD_ENDPOINT: %s", statsdEndpoint)
+
+	if statsdEndpoint != "" {
+
+		log.Info("Using vanilla statsd client to send telemetry to ", statsdEndpoint)
+		sink, err := metrics.NewStatsdSink(statsdEndpoint)
+		if err != nil {
+			log.Warn("Unable to configure statds sink", err.Error())
+			return
+		}
+		metrics.NewGlobal(metrics.DefaultConfig(statsdEndpoint), sink)
+	} else {
+		log.Info("Using in memory metrics accumulator - dump via USR1 signal")
+		inm := metrics.NewInmemSink(10*time.Second, 5*time.Minute)
+		metrics.DefaultInmemSignal(inm)
+		metrics.NewGlobal(metrics.DefaultConfig("xavi"), inm)
+	}
+}
+
 func NewESAtomPubProcessor() orapub.EventProcessor {
+	configureStatsD()
 	return orapub.EventProcessor{
 		Initialize: func(db *sql.DB) error {
 			return nil
