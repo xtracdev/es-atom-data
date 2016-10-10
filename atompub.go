@@ -42,7 +42,7 @@ func readPreviousFeedId(tx *sql.Tx) (sql.NullString, error) {
 
 	defer rows.Close()
 	for rows.Next() {
-		//Only one row can be returned at mpst
+		//Only one row can be returned at most
 		if err := rows.Scan(&feedid); err != nil {
 			return feedid, err
 		}
@@ -70,7 +70,7 @@ func createNewFeed(tx *sql.Tx, currentFeedId sql.NullString) error {
 	var prevFeedId sql.NullString
 	uuidStr, err := uuid()
 	if err != nil {
-		return nil
+		return err
 	}
 
 	if currentFeedId.Valid {
