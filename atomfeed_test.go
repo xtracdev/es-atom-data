@@ -23,6 +23,7 @@ func TestSetThresholdToDefaultOnBadEnvSpec(t *testing.T) {
 	os.Setenv("FEED_THRESHOLD", "2")
 }
 
+/*
 func TestReadPreviousFeedId(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
@@ -131,64 +132,127 @@ func TestGetRecentFeedCount(t *testing.T) {
 	}
 
 }
+*/
 
-func TestProcessEvents(t *testing.T) {
-	db, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
-	}
-	defer db.Close()
+var trueVal = true
+var falseVal = false
 
-	eventPtr := &goes.Event{
-		Source:   "agg1",
-		Version:  1,
-		TypeCode: "foo",
-		Payload:  []byte("ok"),
-	}
+const errorExpected = true
+const noErrorExpected = false
 
-	//processEvents starts a transaction
-	mock.ExpectBegin()
-
-	//table lock is acquired in the happy path
-	execOkResult := sqlmock.NewResult(1, 1)
-	mock.ExpectExec("lock table feed").WillReturnResult(execOkResult)
-
-	//feed id is selected
-	rows := sqlmock.NewRows([]string{"feedid"}).
-		AddRow("XXX")
-	mock.ExpectQuery("select feedid from feed").WillReturnRows(rows)
-
-	//event is inserted into the atom_event table
-	mock.ExpectExec("insert into atom_event").WithArgs(
-		eventPtr.Source, eventPtr.Version, eventPtr.TypeCode, eventPtr.Payload,
-	).WillReturnResult(execOkResult)
-
-	//return the count of threshold to trigger new feed creation
-	rows = sqlmock.NewRows([]string{"count(*)"}).
-		AddRow(FeedThreshold)
-	mock.ExpectQuery(`select count`).WillReturnRows(rows)
-
-	//atom_event is updated with the feed id
-	mock.ExpectExec("update atom_event set feedid").WillReturnResult(execOkResult)
-
-	//insert the new feed into the feed table
-	mock.ExpectExec("insert into feed").WillReturnResult(execOkResult).WithArgs(sqlmock.AnyArg(), "XXX")
-
-	//expect a commit at the end
-	mock.ExpectCommit()
-
-	processor := NewESAtomPubProcessor()
-
-	err = processor.Initialize(db)
-	assert.Nil(t, err)
-
-	err = processor.Processor(db, eventPtr)
-	assert.Nil(t, err)
-
-	err = mock.ExpectationsWereMet()
-	assert.Nil(t, err)
+var processTests = []struct {
+	beginOk           *bool
+	tableLockOk       *bool
+	feedIdSelectOk    *bool
+	eventInsertOk     *bool
+	thesholdCountOk   *bool
+	atomEventUpdateOk *bool
+	feedInsertOk      *bool
+	expectCommit      *bool
+	expectError       bool
+}{
+	{&trueVal, &trueVal, &trueVal, &trueVal, &trueVal, &trueVal, &trueVal, &trueVal, noErrorExpected},
+	{&falseVal, nil, nil, nil, nil, nil, nil, nil, errorExpected},
+	{&trueVal, &falseVal, nil, nil, nil, nil, nil, nil, errorExpected},
 }
 
+func testBeginSetup(mock sqlmock.Sqlmock, ok *bool) {
+	if *ok {
+		mock.ExpectBegin()
+	} else {
+		mock.ExpectBegin().WillReturnError(errors.New("sorry mate no txn for you"))
+	}
+}
+
+func testTableLockSetup(mock sqlmock.Sqlmock, ok *bool) {
+	if ok == nil {
+		return
+	}
+
+	if *ok == true {
+		execOkResult := sqlmock.NewResult(1, 1)
+		mock.ExpectExec("lock table feed").WillReturnResult(execOkResult)
+	} else {
+		mock.ExpectExec("lock table feed").WillReturnError(errors.New("BAM!"))
+	}
+}
+
+func TestProcessEvents(t *testing.T) {
+	for _, tt := range processTests {
+
+		db, mock, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+		}
+		defer db.Close()
+
+		eventPtr := &goes.Event{
+			Source:   "agg1",
+			Version:  1,
+			TypeCode: "foo",
+			Payload:  []byte("ok"),
+		}
+
+		testBeginSetup(mock, tt.beginOk)
+		testTableLockSetup(mock, tt.tableLockOk)
+
+		//feed id is selected
+		if tt.feedIdSelectOk != nil {
+			rows := sqlmock.NewRows([]string{"feedid"}).AddRow("XXX")
+			mock.ExpectQuery("select feedid from feed").WillReturnRows(rows)
+		}
+
+		//event is inserted into the atom_event table
+		if tt.eventInsertOk != nil {
+			execOkResult := sqlmock.NewResult(1, 1)
+			mock.ExpectExec("insert into atom_event").WithArgs(
+				eventPtr.Source, eventPtr.Version, eventPtr.TypeCode, eventPtr.Payload,
+			).WillReturnResult(execOkResult)
+		}
+
+		//return the count of threshold to trigger new feed creation
+		if tt.thesholdCountOk != nil {
+			rows := sqlmock.NewRows([]string{"feedid"}).AddRow("XXX")
+			rows = sqlmock.NewRows([]string{"count(*)"}).
+				AddRow(FeedThreshold)
+			mock.ExpectQuery(`select count`).WillReturnRows(rows)
+		}
+
+		//atom_event is updated with the feed id
+		if tt.atomEventUpdateOk != nil {
+			execOkResult := sqlmock.NewResult(1, 1)
+			mock.ExpectExec("update atom_event set feedid").WillReturnResult(execOkResult)
+		}
+
+		//insert the new feed into the feed table
+		if tt.feedInsertOk != nil {
+			execOkResult := sqlmock.NewResult(1, 1)
+			mock.ExpectExec("insert into feed").WillReturnResult(execOkResult).WithArgs(sqlmock.AnyArg(), "XXX")
+		}
+
+		//expect a commit at the end
+		if tt.expectCommit != nil {
+			mock.ExpectCommit()
+		}
+
+		processor := NewESAtomPubProcessor()
+
+		err = processor.Initialize(db)
+		assert.Nil(t, err)
+
+		err = processor.Processor(db, eventPtr)
+		if tt.expectError {
+			assert.NotNil(t, err)
+		} else {
+			assert.Nil(t, err)
+		}
+
+		err = mock.ExpectationsWereMet()
+		assert.Nil(t, err)
+	}
+}
+
+/*
 func TestProcessorBeginTxnFailure(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
@@ -204,7 +268,22 @@ func TestProcessorBeginTxnFailure(t *testing.T) {
 	assert.Nil(t, err)
 }
 
-func TestProcessEventsUpdateFeedIdsFailure(t *testing.T) {
+func TestProcessorTableLockError(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer db.Close()
 
+	//processEvents starts a transaction
+	mock.ExpectBegin()
 
+	//table lock is acquired in the happy path
+	mock.ExpectExec("lock table feed").WillReturnError(errors.New("whhops"))
+
+	err = processEvent(db, nil)
+	assert.NotNil(t, err)
+	err = mock.ExpectationsWereMet()
+	assert.Nil(t, err)
 }
+*/

@@ -116,6 +116,9 @@ func processEvent(db *sql.DB, event *goes.Event) error {
 
 	//Get the current feed id
 	feedid, err := readPreviousFeedId(tx)
+	if err != nil {
+		return err
+	}
 	log.Debugf("previous feed id is %s", feedid.String)
 
 	//Insert current row
