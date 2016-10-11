@@ -1,5 +1,7 @@
 # Event Source Atom Data
 
+[![CircleCI](https://circleci.com/gh/xtracdev/es-atom-data.svg?style=svg)](https://circleci.com/gh/xtracdev/es-atom-data)
+
 This project processes events from the [Oracle Event Store](https://github.com/xtracdev/oraeventstore),
 writing them into organized storage to allow navigating published events
 using the atom protocol.
