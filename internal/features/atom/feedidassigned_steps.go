@@ -26,7 +26,7 @@ func init() {
 	Given(`^some initial events and no feeds$`, func() {
 		log.Info("check init")
 		if initFailed {
-			T.Errorf("Failed init")
+			assert.False(T, initFailed, "Test env init failure")
 			return
 		}
 
@@ -55,6 +55,10 @@ func init() {
 	})
 
 	When(`^the feed page threshold is reached$`, func() {
+		if initFailed {
+			return
+		}
+
 		os.Setenv("FEED_THRESHOLD", "2")
 		ad.ReadFeedThresholdFromEnv()
 		assert.Equal(T, 2, ad.FeedThreshold)
@@ -71,6 +75,10 @@ func init() {
 	})
 
 	Then(`^feed is updated with a new feedid with a null previous feed$`, func() {
+		if initFailed {
+			return
+		}
+
 		var count int
 		err := db.QueryRow("select count(*) from feed").Scan(&count)
 		assert.Nil(T, err)
@@ -83,6 +91,10 @@ func init() {
 	})
 
 	And(`^the recent items with a null id are updated with the feedid$`, func() {
+		if initFailed {
+			return
+		}
+
 		rows, err := db.Query("select aggregate_id, feedid from atom_event")
 		if assert.Nil(T, err) {
 			defer rows.Close()
@@ -105,10 +117,15 @@ func init() {
 	})
 
 	Given(`^some initial events and some feeds$`, func() {
+		assert.False(T, initFailed, "Test env init failure")
 		//From the previous test run
 	})
 
 	When(`^the feed page threshold is reached again$`, func() {
+		if initFailed {
+			return
+		}
+
 		eventPtr := &goes.Event{
 			Source:   "agg3",
 			Version:  1,
@@ -131,6 +148,10 @@ func init() {
 	})
 
 	Then(`^feed is updated with a new feedid with the previous feed id as previous$`, func() {
+		if initFailed {
+			return
+		}
+
 		var current, previous sql.NullString
 		err := db.QueryRow("select feedid, previous from feed where id = (select max(id) from feed)").Scan(&current, &previous)
 		if assert.Nil(T, err) {
@@ -142,6 +163,10 @@ func init() {
 	})
 
 	And(`^the most recent items with a null id are updated with the new feedid$`, func() {
+		if initFailed {
+			return
+		}
+
 		var nullCount int = -1
 		err := db.QueryRow("select count(*) from atom_event where feedid is null").Scan(&nullCount)
 		assert.Nil(T, err)
