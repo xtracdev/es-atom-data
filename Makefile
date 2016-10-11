@@ -8,4 +8,5 @@ build:
 	go get github.com/stretchr/testify/assert
 	go get github.com/armon/go-metrics
 	go get github.com/xtracdev/orapub
+	go test
 	gucumber

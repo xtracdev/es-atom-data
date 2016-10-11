@@ -8,4 +8,4 @@ dependencies:
 
 test:
   override:
-    - echo 'test automation tbd'
+    - echo 'test automation run as part of the docker build'
