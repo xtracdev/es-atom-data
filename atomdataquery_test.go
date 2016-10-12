@@ -5,6 +5,7 @@ import (
 	"gopkg.in/DATA-DOG/go-sqlmock.v1"
 	"time"
 	"github.com/stretchr/testify/assert"
+	"errors"
 )
 
 
@@ -34,6 +35,23 @@ func TestQueryForRecent(t *testing.T) {
 			assert.Equal(t, event.Source, "1x2x333")
 			assert.Equal(t, event.Version, 3)
 		}
+	}
+}
+
+func TestQueryForRecentQueryError(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer db.Close()
+
+	mock.ExpectQuery("select").WillReturnError(errors.New("boom"))
+
+	_, err = RetrieveRecent(db)
+	if assert.NotNil(t,err) {
+		assert.Equal(t, "boom", err.Error())
+		err = mock.ExpectationsWereMet()
+		assert.Nil(t, err, "expectations not met in TestQueryForRecentQueryError")
 	}
 }
 
