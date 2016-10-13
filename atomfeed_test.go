@@ -2,13 +2,13 @@ package esatompub
 
 import (
 	"errors"
+	log "github.com/Sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/xtracdev/goes"
 	"gopkg.in/DATA-DOG/go-sqlmock.v1"
+	"net"
 	"os"
 	"testing"
-	"net"
-	log "github.com/Sirupsen/logrus"
 )
 
 func TestSetThresholdFromEnv(t *testing.T) {
@@ -172,10 +172,9 @@ func testFeedInsertOk(mock sqlmock.Sqlmock, ok *bool) {
 	}
 }
 
-
 func TestProcessEvents(t *testing.T) {
 
-	addr,err := net.ResolveUDPAddr("udp",":0")
+	addr, err := net.ResolveUDPAddr("udp", ":0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -186,7 +185,6 @@ func TestProcessEvents(t *testing.T) {
 	}
 
 	log.Infof("addr: %v", ln.LocalAddr())
-
 
 	os.Setenv("STATSD_ENDPOINT", ln.LocalAddr().String())
 

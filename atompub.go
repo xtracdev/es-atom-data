@@ -18,11 +18,10 @@ const defaultFeedThreshold = 100
 const (
 	sqlLatestFeedId        = `select feedid from feed where id = (select max(id) from feed)`
 	sqlInsertEventIntoFeed = `insert into atom_event (aggregate_id, version,typecode, payload) values(:1,:2,:3,:4)`
-	sqlRecentFeedCount = `select count(*) from atom_event where feedid is null`
-	sqlUpdateFeedIds = `update atom_event set feedid = :1 where feedid is null`
-	sqlInsertFeed = `insert into feed (feedid, previous) values (:1, :2)`
-	sqlLockTable = `lock table feed in exclusive mode`
-	sqlSelectRecent = `select event_time, aggregate_id, version, typecode, payload from atom_event where feedid is null`
+	sqlRecentFeedCount     = `select count(*) from atom_event where feedid is null`
+	sqlUpdateFeedIds       = `update atom_event set feedid = :1 where feedid is null`
+	sqlInsertFeed          = `insert into feed (feedid, previous) values (:1, :2)`
+	sqlLockTable           = `lock table feed in exclusive mode`
 )
 
 var FeedThreshold = defaultFeedThreshold
@@ -40,7 +39,7 @@ func logDatabaseTimingStats(sql string, start time.Time, err error) {
 			metrics.AddSample(key, float32(ms))
 			metrics.IncrCounter(key, 1)
 		}
-	}(sql,duration,err)
+	}(sql, duration, err)
 }
 
 func writeProcessEventStats(start time.Time, err error) {
@@ -56,7 +55,7 @@ func writeProcessEventStats(start time.Time, err error) {
 			metrics.AddSample(key, float32(ms))
 			metrics.IncrCounter(key, 1)
 		}
-	}(duration,err)
+	}(duration, err)
 }
 
 func ReadFeedThresholdFromEnv() {
@@ -96,7 +95,7 @@ func selectLatestFeed(tx *sql.Tx) (sql.NullString, error) {
 	}
 
 	if err = rows.Err(); err != nil {
-		return feedid,err
+		return feedid, err
 	}
 
 	logDatabaseTimingStats("sqlLatestFeedId", start, err)
@@ -146,7 +145,6 @@ func createNewFeed(tx *sql.Tx, currentFeedId sql.NullString) error {
 		return err
 	}
 
-
 	log.Infof("Insert into feed %v, %v", currentFeedId, prevFeedId)
 	start = time.Now()
 	_, err = tx.Exec(sqlInsertFeed,
@@ -165,7 +163,7 @@ func lockTable(tx *sql.Tx) error {
 func doRollback(tx *sql.Tx) {
 	err := tx.Rollback()
 	if err != nil {
-		log.Warnf("Error on transaction rollback: %s",err.Error())
+		log.Warnf("Error on transaction rollback: %s", err.Error())
 	}
 }
 
@@ -256,7 +254,7 @@ func NewESAtomPubProcessor() orapub.EventProcessor {
 		},
 		Processor: func(db *sql.DB, event *goes.Event) error {
 			start := time.Now()
-			err :=  processEvent(db, event)
+			err := processEvent(db, event)
 			writeProcessEventStats(start, err)
 			return err
 		},

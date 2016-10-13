@@ -1,14 +1,12 @@
 package esatompub
 
 import (
-	"testing"
-	"gopkg.in/DATA-DOG/go-sqlmock.v1"
-	"time"
-	"github.com/stretchr/testify/assert"
 	"errors"
+	"github.com/stretchr/testify/assert"
+	"gopkg.in/DATA-DOG/go-sqlmock.v1"
+	"testing"
+	"time"
 )
-
-
 
 func TestQueryForRecent(t *testing.T) {
 	db, mock, err := sqlmock.New()
@@ -20,11 +18,11 @@ func TestQueryForRecent(t *testing.T) {
 	ts := time.Now()
 	rows := sqlmock.NewRows([]string{"event_time", "aggregate_id",
 		"version", "typecode", "payload"},
-			).AddRow(ts, "1x2x333", 3, "foo", []byte("yeah ok"))
+	).AddRow(ts, "1x2x333", 3, "foo", []byte("yeah ok"))
 	mock.ExpectQuery("select").WillReturnRows(rows)
 
 	events, err := RetrieveRecent(db)
-	if assert.Nil(t,err) {
+	if assert.Nil(t, err) {
 		err := mock.ExpectationsWereMet()
 		assert.Nil(t, err, "mock expectations were not met")
 		if assert.Equal(t, 1, len(events), "Expected an event back") {
@@ -48,7 +46,7 @@ func TestQueryForRecentQueryError(t *testing.T) {
 	mock.ExpectQuery("select").WillReturnError(errors.New("boom"))
 
 	_, err = RetrieveRecent(db)
-	if assert.NotNil(t,err) {
+	if assert.NotNil(t, err) {
 		assert.Equal(t, "boom", err.Error())
 		err = mock.ExpectationsWereMet()
 		assert.Nil(t, err, "expectations not met in TestQueryForRecentQueryError")
@@ -72,7 +70,7 @@ func TestQueryForRecentScanError(t *testing.T) {
 	mock.ExpectQuery("select").WillReturnRows(rows)
 
 	_, err = RetrieveRecent(db)
-	if assert.NotNil(t,err) {
+	if assert.NotNil(t, err) {
 		err = mock.ExpectationsWereMet()
 		assert.Nil(t, err, "expectations not met in TestQueryForRecentQueryError")
 	}
@@ -88,11 +86,11 @@ func TestQueryForRecentFinalRowsError(t *testing.T) {
 	ts := time.Now()
 	rows := sqlmock.NewRows([]string{"event_time", "aggregate_id",
 		"version", "typecode", "payload"},
-	).AddRow(ts, "1x2x333", 3, "foo", []byte("yeah ok")).RowError(0,errors.New("dang"))
+	).AddRow(ts, "1x2x333", 3, "foo", []byte("yeah ok")).RowError(0, errors.New("dang"))
 	mock.ExpectQuery("select").WillReturnRows(rows)
 
 	_, err = RetrieveRecent(db)
-	if assert.NotNil(t,err) {
+	if assert.NotNil(t, err) {
 		assert.Equal(t, "dang", err.Error())
 		err = mock.ExpectationsWereMet()
 		assert.Nil(t, err, "expectations not met in TestQueryForRecentQueryError")
@@ -111,10 +109,10 @@ func TestQueryForLastFeed(t *testing.T) {
 	mock.ExpectQuery("select").WillReturnRows(rows)
 
 	feedid, err := RetrieveLastFeed(db)
-	if assert.Nil(t,err) {
+	if assert.Nil(t, err) {
 		err := mock.ExpectationsWereMet()
 		assert.Nil(t, err, "mock expectations were not met")
-		assert.Equal(t, "feed-xxx",feedid)
+		assert.Equal(t, "feed-xxx", feedid)
 	}
 }
 
@@ -129,10 +127,10 @@ func TestQueryForLastFeedNoFeed(t *testing.T) {
 	mock.ExpectQuery("select").WillReturnRows(rows)
 
 	feedid, err := RetrieveLastFeed(db)
-	if assert.Nil(t,err) {
+	if assert.Nil(t, err) {
 		err := mock.ExpectationsWereMet()
 		assert.Nil(t, err, "mock expectations were not met")
-		assert.Equal(t, "",feedid)
+		assert.Equal(t, "", feedid)
 	}
 }
 
@@ -146,8 +144,8 @@ func TestQueryForLastFeedError(t *testing.T) {
 	mock.ExpectQuery("select").WillReturnError(errors.New("dang"))
 
 	_, err = RetrieveLastFeed(db)
-	if assert.NotNil(t,err) {
-		assert.Equal(t, "dang",err.Error())
+	if assert.NotNil(t, err) {
+		assert.Equal(t, "dang", err.Error())
 		err := mock.ExpectationsWereMet()
 		assert.Nil(t, err, "mock expectations were not met")
 
