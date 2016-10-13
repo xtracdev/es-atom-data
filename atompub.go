@@ -22,6 +22,7 @@ const (
 	sqlUpdateFeedIds = `update atom_event set feedid = :1 where feedid is null`
 	sqlInsertFeed = `insert into feed (feedid, previous) values (:1, :2)`
 	sqlLockTable = `lock table feed in exclusive mode`
+	sqlSelectRecent = `select event_time, aggregate_id, version, typecode, payload from atom_event where feedid is null`
 )
 
 var FeedThreshold = defaultFeedThreshold
