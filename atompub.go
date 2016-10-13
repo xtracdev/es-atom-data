@@ -94,6 +94,10 @@ func selectLatestFeed(tx *sql.Tx) (sql.NullString, error) {
 		}
 	}
 
+	if err = rows.Err(); err != nil {
+		return feedid,err
+	}
+
 	logDatabaseTimingStats("sqlLatestFeedId", start, err)
 	return feedid, nil
 }
