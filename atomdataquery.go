@@ -14,7 +14,7 @@ type TimestampedEvent struct {
 func RetrieveRecent(db *sql.DB)([]TimestampedEvent,error) {
 	var events []TimestampedEvent
 
-	rows, err := db.Query("select event_time, aggregate_id, version, typecode, payload from atom_event where feedid is null")
+	rows, err := db.Query(sqlSelectRecent)
 	if err != nil {
 		return events,err
 	}
@@ -50,4 +50,17 @@ func RetrieveRecent(db *sql.DB)([]TimestampedEvent,error) {
 	}
 
 	return events,nil
+}
+
+func RetrieveLastFeed(db *sql.DB) (string, error) {
+	var feedid string
+
+	err := db.QueryRow(sqlLatestFeedId).Scan(&feedid)
+	if err == sql.ErrNoRows {
+		return "",nil
+	} else if err != nil {
+		return "", err
+	}
+
+	return feedid,nil
 }

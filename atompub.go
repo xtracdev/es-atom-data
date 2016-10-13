@@ -22,6 +22,7 @@ const (
 	sqlUpdateFeedIds = `update atom_event set feedid = :1 where feedid is null`
 	sqlInsertFeed = `insert into feed (feedid, previous) values (:1, :2)`
 	sqlLockTable = `lock table feed in exclusive mode`
+	sqlSelectRecent = `select event_time, aggregate_id, version, typecode, payload from atom_event where feedid is null`
 )
 
 var FeedThreshold = defaultFeedThreshold
@@ -94,6 +95,10 @@ func selectLatestFeed(tx *sql.Tx) (sql.NullString, error) {
 		}
 	}
 
+	if err = rows.Err(); err != nil {
+		return feedid,err
+	}
+
 	logDatabaseTimingStats("sqlLatestFeedId", start, err)
 	return feedid, nil
 }
@@ -157,6 +162,13 @@ func lockTable(tx *sql.Tx) error {
 	return err
 }
 
+func doRollback(tx *sql.Tx) {
+	err := tx.Rollback()
+	if err != nil {
+		log.Warnf("Error on transaction rollback: %s",err.Error())
+	}
+}
+
 func processEvent(db *sql.DB, event *goes.Event) error {
 	log.Debug("Processor invoked")
 
@@ -167,17 +179,17 @@ func processEvent(db *sql.DB, event *goes.Event) error {
 		return err
 	}
 
-	defer tx.Rollback()
-
 	//Treat the processing as a critical section to avoid concurrency headaches.
 	err = lockTable(tx)
 	if err != nil {
+		doRollback(tx)
 		return err
 	}
 
 	//Get the current feed id
 	feedid, err := selectLatestFeed(tx)
 	if err != nil {
+		doRollback(tx)
 		return err
 	}
 	log.Debugf("previous feed id is %s", feedid.String)
@@ -185,12 +197,14 @@ func processEvent(db *sql.DB, event *goes.Event) error {
 	//Insert current row
 	err = writeEventToAtomEventTable(tx, event)
 	if err != nil {
+		doRollback(tx)
 		return err
 	}
 
 	//Get current count of records in the current feed
 	count, err := getRecentFeedCount(tx)
 	if err != nil {
+		doRollback(tx)
 		return err
 	}
 	log.Debugf("current count is %d", count)
@@ -199,12 +213,16 @@ func processEvent(db *sql.DB, event *goes.Event) error {
 	if count == FeedThreshold {
 		err := createNewFeed(tx, feedid)
 		if err != nil {
+			doRollback(tx)
 			return err
 		}
 	}
 
 	log.Debug("commit txn")
-	tx.Commit()
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

@@ -99,3 +99,57 @@ func TestQueryForRecentFinalRowsError(t *testing.T) {
 	}
 
 }
+
+func TestQueryForLastFeed(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer db.Close()
+
+	rows := sqlmock.NewRows([]string{"feedid"}).AddRow("feed-xxx")
+	mock.ExpectQuery("select").WillReturnRows(rows)
+
+	feedid, err := RetrieveLastFeed(db)
+	if assert.Nil(t,err) {
+		err := mock.ExpectationsWereMet()
+		assert.Nil(t, err, "mock expectations were not met")
+		assert.Equal(t, "feed-xxx",feedid)
+	}
+}
+
+func TestQueryForLastFeedNoFeed(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer db.Close()
+
+	rows := sqlmock.NewRows([]string{"feedid"})
+	mock.ExpectQuery("select").WillReturnRows(rows)
+
+	feedid, err := RetrieveLastFeed(db)
+	if assert.Nil(t,err) {
+		err := mock.ExpectationsWereMet()
+		assert.Nil(t, err, "mock expectations were not met")
+		assert.Equal(t, "",feedid)
+	}
+}
+
+func TestQueryForLastFeedError(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer db.Close()
+
+	mock.ExpectQuery("select").WillReturnError(errors.New("dang"))
+
+	_, err = RetrieveLastFeed(db)
+	if assert.NotNil(t,err) {
+		assert.Equal(t, "dang",err.Error())
+		err := mock.ExpectationsWereMet()
+		assert.Nil(t, err, "mock expectations were not met")
+
+	}
+}
