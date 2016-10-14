@@ -16,6 +16,7 @@ const (
 	sqlSelectForFeed      = `select event_time, aggregate_id, version, typecode, payload from atom_event where feedid = :1`
 	sqlSelectPreviousFeed = `select previous from feed where feedid = :1`
 	sqlSelectNextFeed     = `select feedid from feed where previous = :1`
+	sqlSelectEvent        = `select event_time, typecode, payload from atom_event where aggregate_id = :1 and version = :2`
 )
 
 func RetrieveRecent(db *sql.DB) ([]TimestampedEvent, error) {
@@ -111,4 +112,29 @@ func RetrieveNextFeed(db *sql.DB, feedId string) (sql.NullString, error) {
 	}
 
 	return previous, nil
+}
+
+func RetrieveEvent(db *sql.DB, aggID string, version int) (TimestampedEvent, error) {
+	var event TimestampedEvent
+
+	var eventTime time.Time
+	var typecode string
+	var payload []byte
+
+	err := db.QueryRow(sqlSelectEvent, aggID, version).Scan(&eventTime, &typecode, &payload)
+	if err != nil {
+		return event, err //Caller can sort out no rows vs other error
+	}
+
+	event = TimestampedEvent{
+		Event: goes.Event{
+			Source:   aggID,
+			Version:  version,
+			Payload:  payload,
+			TypeCode: typecode,
+		},
+		Timestamp: eventTime,
+	}
+
+	return event, nil
 }
