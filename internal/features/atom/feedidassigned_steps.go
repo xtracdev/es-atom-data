@@ -145,6 +145,11 @@ func init() {
 
 		err = atomProcessor.Processor(db, eventPtr)
 		assert.Nil(T, err)
+
+		event, err := ad.RetrieveEvent(db, eventPtr.Source, eventPtr.Version)
+		if assert.Nil(T,err) {
+			log.Infof("event is %+v",event)
+		}
 	})
 
 	Then(`^feed is updated with a new feedid with the previous feed id as previous$`, func() {
