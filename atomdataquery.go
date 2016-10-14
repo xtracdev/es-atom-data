@@ -121,9 +121,26 @@ func RetrieveEvent(db *sql.DB, aggID string, version int) (TimestampedEvent, err
 	var typecode string
 	var payload []byte
 
-	err := db.QueryRow(sqlSelectEvent, aggID, version).Scan(&eventTime, &typecode, &payload)
+	rows, err := db.Query(sqlSelectEvent, aggID, version)
 	if err != nil {
-		return event, err //Caller can sort out no rows vs other error
+		return event, err
+	}
+
+	var scanCount int
+	for rows.Next() {
+		scanCount += 1
+		err := rows.Scan(&eventTime, &typecode, &payload)
+		if err != nil {
+			return event, err
+		}
+	}
+
+	if scanCount == 0 {
+		return event, sql.ErrNoRows
+	}
+
+	if err = rows.Err(); err != nil {
+		return event, err
 	}
 
 	event = TimestampedEvent{
