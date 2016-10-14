@@ -219,6 +219,7 @@ func processEvent(db *sql.DB, event *goes.Event) error {
 	log.Debug("commit txn")
 	err = tx.Commit()
 	if err != nil {
+		log.Warnf("Error commiting processEvent transaction: %s", err.Error())
 		return err
 	}
 

@@ -15,6 +15,7 @@ const (
 	sqlSelectRecent       = `select event_time, aggregate_id, version, typecode, payload from atom_event where feedid is null`
 	sqlSelectForFeed      = `select event_time, aggregate_id, version, typecode, payload from atom_event where feedid = :1`
 	sqlSelectPreviousFeed = `select previous from feed where feedid = :1`
+	sqlSelectNextFeed     = `select feedid from feed where previous = :1`
 )
 
 func RetrieveRecent(db *sql.DB) ([]TimestampedEvent, error) {
@@ -28,7 +29,14 @@ func RetrieveArchive(db *sql.DB, feedid string) ([]TimestampedEvent, error) {
 func retrieveEvents(db *sql.DB, query string, feedid string) ([]TimestampedEvent, error) {
 	var events []TimestampedEvent
 
-	rows, err := db.Query(query, feedid)
+	var rows *sql.Rows
+	var err error
+	if feedid == "" {
+		rows, err = db.Query(query)
+	} else {
+		rows, err = db.Query(query, feedid)
+	}
+
 	if err != nil {
 		return events, err
 	}
@@ -79,10 +87,10 @@ func RetrieveLastFeed(db *sql.DB) (string, error) {
 	return feedid, nil
 }
 
-func RetrievePreviousFeed(db *sql.DB, feedId string) (sql.NullString, error) {
+func RetrievePreviousFeed(db *sql.DB, id string) (sql.NullString, error) {
 	var feedid sql.NullString
 
-	err := db.QueryRow(sqlLatestFeedId, feedid).Scan(&feedid)
+	err := db.QueryRow(sqlSelectPreviousFeed, id).Scan(&feedid)
 	if err == sql.ErrNoRows {
 		return feedid, nil
 	} else if err != nil {
@@ -90,4 +98,17 @@ func RetrievePreviousFeed(db *sql.DB, feedId string) (sql.NullString, error) {
 	}
 
 	return feedid, nil
+}
+
+func RetrieveNextFeed(db *sql.DB, feedId string) (sql.NullString, error) {
+	var previous sql.NullString
+
+	err := db.QueryRow(sqlSelectNextFeed, feedId).Scan(&previous)
+	if err == sql.ErrNoRows {
+		return previous, nil
+	} else if err != nil {
+		return previous, err
+	}
+
+	return previous, nil
 }
