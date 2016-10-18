@@ -29,12 +29,17 @@ create table atom_event (
     payload blob
 );
 
+create index atom_event_feedid_ix on atom_event (feedid);
+
 create table feed (
     id  number generated always as identity,
     event_time timestamp DEFAULT current_timestamp,
     feedid varchar2(100) not null,
     previous varchar2(100)
 );
+
+create index feed_feedid_ix on feed(feedid);
+create index feed_previous_ix on feed(previous);
 </pre>
 
 ## Testing
