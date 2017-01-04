@@ -36,9 +36,9 @@ func init() {
 		assert.Nil(T, err, "Failed to initialize atom publisher")
 
 		log.Info("clean out tables")
-		_, err = db.Exec("delete from atom_event")
+		_, err = db.Exec("delete from t_aeae_atom_event")
 		assert.Nil(T, err)
-		_, err = db.Exec("delete from feed")
+		_, err = db.Exec("delete from t_aefd_feed")
 		assert.Nil(T, err)
 
 		log.Info("add some events")
@@ -80,11 +80,11 @@ func init() {
 		}
 
 		var count int
-		err := db.QueryRow("select count(*) from feed").Scan(&count)
+		err := db.QueryRow("select count(*) from t_aefd_feed").Scan(&count)
 		assert.Nil(T, err)
 		assert.Equal(T, 1, count, "Expected a single feed entry")
 
-		err = db.QueryRow("select feedid from feed").Scan(&feedid)
+		err = db.QueryRow("select feedid from t_aefd_feed").Scan(&feedid)
 		assert.Nil(T, err)
 		assert.True(T, feedid.Valid, "Feed id is not valid")
 		assert.True(T, feedid.String != "", "Feed id is empty")
@@ -95,7 +95,7 @@ func init() {
 			return
 		}
 
-		rows, err := db.Query("select aggregate_id, feedid from atom_event")
+		rows, err := db.Query("select aggregate_id, feedid from t_aeae_atom_event")
 		if assert.Nil(T, err) {
 			defer rows.Close()
 
@@ -158,7 +158,7 @@ func init() {
 		}
 
 		var current, previous sql.NullString
-		err := db.QueryRow("select feedid, previous from feed where id = (select max(id) from feed)").Scan(&current, &previous)
+		err := db.QueryRow("select feedid, previous from t_aefd_feed where id = (select max(id) from t_aefd_feed)").Scan(&current, &previous)
 		if assert.Nil(T, err) {
 			assert.True(T, current.Valid)
 			if assert.True(T, previous.Valid) {
@@ -173,7 +173,7 @@ func init() {
 		}
 
 		var nullCount int = -1
-		err := db.QueryRow("select count(*) from atom_event where feedid is null").Scan(&nullCount)
+		err := db.QueryRow("select count(*) from t_aeae_atom_event where feedid is null").Scan(&nullCount)
 		assert.Nil(T, err)
 	})
 

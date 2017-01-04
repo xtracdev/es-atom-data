@@ -41,7 +41,7 @@ func TestReadPreviousFeedIdScanError(t *testing.T) {
 	rows := sqlmock.NewRows([]string{"feedid"}).AddRow(foo)
 
 	mock.ExpectBegin()
-	mock.ExpectQuery(`select feedid from feed where id = \(select max\(id\) from feed\)`).WillReturnRows(rows)
+	mock.ExpectQuery(`select feedid from t_aefd_feed where id = \(select max\(id\) from t_aefd_feed\)`).WillReturnRows(rows)
 
 	tx, _ := db.Begin()
 	_, err = selectLatestFeed(tx)
@@ -92,9 +92,9 @@ func testTableLockSetup(mock sqlmock.Sqlmock, ok *bool) {
 
 	if *ok == true {
 		execOkResult := sqlmock.NewResult(1, 1)
-		mock.ExpectExec("lock table feed").WillReturnResult(execOkResult)
+		mock.ExpectExec("lock table t_aefd_feed").WillReturnResult(execOkResult)
 	} else {
-		mock.ExpectExec("lock table feed").WillReturnError(errors.New("BAM!"))
+		mock.ExpectExec("lock table t_aefd_feed").WillReturnError(errors.New("BAM!"))
 	}
 }
 
@@ -105,9 +105,9 @@ func testFeedIdSelectSetup(mock sqlmock.Sqlmock, ok *bool) {
 
 	if *ok == true {
 		rows := sqlmock.NewRows([]string{"feedid"}).AddRow("XXX")
-		mock.ExpectQuery("select feedid from feed").WillReturnRows(rows)
+		mock.ExpectQuery("select feedid from t_aefd_feed").WillReturnRows(rows)
 	} else {
-		mock.ExpectQuery("select feedid from feed").WillReturnError(errors.New("BAM!"))
+		mock.ExpectQuery("select feedid from t_aefd_feed").WillReturnError(errors.New("BAM!"))
 	}
 }
 
@@ -118,11 +118,11 @@ func testEventInsertSetup(mock sqlmock.Sqlmock, ok *bool, eventPtr *goes.Event) 
 
 	if *ok == true {
 		execOkResult := sqlmock.NewResult(1, 1)
-		mock.ExpectExec("insert into atom_event").WithArgs(
+		mock.ExpectExec("insert into t_aeae_atom_event").WithArgs(
 			eventPtr.Source, eventPtr.Version, eventPtr.TypeCode, eventPtr.Payload,
 		).WillReturnResult(execOkResult)
 	} else {
-		mock.ExpectExec("insert into atom_event").WillReturnError(errors.New("BAM!"))
+		mock.ExpectExec("insert into t_aeae_atom_event").WillReturnError(errors.New("BAM!"))
 	}
 }
 
@@ -146,9 +146,9 @@ func testThresholdAtomEventUpdateSetup(mock sqlmock.Sqlmock, ok *bool) {
 	}
 	if *ok == true {
 		execOkResult := sqlmock.NewResult(1, 1)
-		mock.ExpectExec("update atom_event set feedid").WillReturnResult(execOkResult)
+		mock.ExpectExec("update t_aeae_atom_event set feedid").WillReturnResult(execOkResult)
 	} else {
-		mock.ExpectExec("update atom_event set feedid").WillReturnError(errors.New("BAM!"))
+		mock.ExpectExec("update t_aeae_atom_event set feedid").WillReturnError(errors.New("BAM!"))
 	}
 }
 
@@ -168,7 +168,7 @@ func testExpectCommitSetup(mock sqlmock.Sqlmock, ok *bool) {
 func testFeedInsertOk(mock sqlmock.Sqlmock, ok *bool) {
 	if ok != nil {
 		execOkResult := sqlmock.NewResult(1, 1)
-		mock.ExpectExec("insert into feed").WillReturnResult(execOkResult).WithArgs(sqlmock.AnyArg(), "XXX")
+		mock.ExpectExec("insert into t_aefd_feed").WillReturnResult(execOkResult).WithArgs(sqlmock.AnyArg(), "XXX")
 	}
 }
 

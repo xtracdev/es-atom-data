@@ -16,12 +16,12 @@ import (
 const defaultFeedThreshold = 100
 
 const (
-	sqlLatestFeedId        = `select feedid from feed where id = (select max(id) from feed)`
-	sqlInsertEventIntoFeed = `insert into atom_event (aggregate_id, version,typecode, payload) values(:1,:2,:3,:4)`
-	sqlRecentFeedCount     = `select count(*) from atom_event where feedid is null`
-	sqlUpdateFeedIds       = `update atom_event set feedid = :1 where feedid is null`
-	sqlInsertFeed          = `insert into feed (feedid, previous) values (:1, :2)`
-	sqlLockTable           = `lock table feed in exclusive mode`
+	sqlLatestFeedId        = `select feedid from t_aefd_feed where id = (select max(id) from t_aefd_feed)`
+	sqlInsertEventIntoFeed = `insert into t_aeae_atom_event (aggregate_id, version,typecode, payload) values(:1,:2,:3,:4)`
+	sqlRecentFeedCount     = `select count(*) from t_aeae_atom_event where feedid is null`
+	sqlUpdateFeedIds       = `update t_aeae_atom_event set feedid = :1 where feedid is null`
+	sqlInsertFeed          = `insert into t_aefd_feed (feedid, previous) values (:1, :2)`
+	sqlLockTable           = `lock table t_aefd_feed in exclusive mode`
 )
 
 var FeedThreshold = defaultFeedThreshold

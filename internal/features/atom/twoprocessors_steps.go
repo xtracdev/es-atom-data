@@ -49,9 +49,9 @@ func init() {
 		assert.Nil(T, err, "Failed to initialize atom publisher")
 
 		if assert.Nil(T, err) {
-			_, err = db.Exec("delete from atom_event")
+			_, err = db.Exec("delete from t_aeae_atom_event")
 			assert.Nil(T, err)
-			_, err = db.Exec("delete from feed")
+			_, err = db.Exec("delete from t_aefd_feed")
 			assert.Nil(T, err)
 		}
 
@@ -111,13 +111,13 @@ func init() {
 
 	Then(`^(\d+) feeds are created$`, func(numfeeds int) {
 		var feedCount = -1
-		err := db.QueryRow("select count(*) from feed").Scan(&feedCount)
+		err := db.QueryRow("select count(*) from t_aefd_feed").Scan(&feedCount)
 		assert.Nil(T, err)
 		assert.Equal(T, 20, feedCount)
 	})
 
 	And(`^two events belong to each feed$`, func() {
-		rows, err := db.Query("select feedid, count(*) count from atom_event group by feedid")
+		rows, err := db.Query("select feedid, count(*) count from t_aeae_atom_event group by feedid")
 		if assert.Nil(T, err) {
 
 			defer rows.Close()

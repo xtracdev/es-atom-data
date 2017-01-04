@@ -12,11 +12,11 @@ type TimestampedEvent struct {
 }
 
 const (
-	sqlSelectRecent       = `select event_time, aggregate_id, version, typecode, payload from atom_event where feedid is null order by id desc`
-	sqlSelectForFeed      = `select event_time, aggregate_id, version, typecode, payload from atom_event where feedid = :1 order by id desc`
-	sqlSelectPreviousFeed = `select previous from feed where feedid = :1`
-	sqlSelectNextFeed     = `select feedid from feed where previous = :1`
-	sqlSelectEvent        = `select event_time, typecode, payload from atom_event where aggregate_id = :1 and version = :2`
+	sqlSelectRecent       = `select event_time, aggregate_id, version, typecode, payload from t_aeae_atom_event where feedid is null order by id desc`
+	sqlSelectForFeed      = `select event_time, aggregate_id, version, typecode, payload from t_aeae_atom_event where feedid = :1 order by id desc`
+	sqlSelectPreviousFeed = `select previous from t_aefd_feed where feedid = :1`
+	sqlSelectNextFeed     = `select feedid from t_aefd_feed where previous = :1`
+	sqlSelectEvent        = `select event_time, typecode, payload from t_aeae_atom_event where aggregate_id = :1 and version = :2`
 )
 
 func RetrieveRecent(db *sql.DB) ([]TimestampedEvent, error) {
